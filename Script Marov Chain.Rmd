@@ -19,7 +19,7 @@ library(reshape2)
 Load Data:
 -> For Changing or creating new rda files, pls, use the following script: "xxxx Loading Data.rmd"
 ```{r}
-load("df_markov.rda")
+load("/home/Vera_Weidmann/Supermarket/00_Data/df_markov.rda")
 ```
 
 
@@ -35,7 +35,7 @@ df_markov <- df_markov %>%
 df_user1 <- df_markov %>%
   filter (user_id == 1)
 
-save(df_user1, file = "df_user1.rda")
+save(df_user1, file = "/home/Vera_Weidmann/Supermarket/00_Data/df_user1.rda")
 ```
 
 

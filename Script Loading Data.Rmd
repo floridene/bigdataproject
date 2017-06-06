@@ -43,7 +43,7 @@ df_total <- order_products %>%
 dim(order_products)
 dim(df_total)
 
-save(df_total, file ="df_total.rda")
+save(df_total, file ="/home/Vera_Weidmann/Supermarket/00_Data/df_total.rda")
 ```
 
 Creating a test dataset from table orders
@@ -52,7 +52,7 @@ test_orders <- orders %>%
   filter (eval_set == "test")
 test_orders <- test_orders[,c(1,2,4)]
 
-save(test_orders, file = "test_orders.rda")
+save(test_orders, file = "/home/Vera_Weidmann/Supermarket/00_Data/test_orders.rda")
 ```
 
 Data for Markov chain modeling: user_id, order_number, product_id
@@ -61,7 +61,7 @@ df_markov <- rbind(order_products_prior,order_products_train)
 df_markov <- left_join(df_markov, orders, by = "order_id", sort = F)
 df_markov <- df_markov[,c("user_id", "order_number","product_id")]
 
-save(df_markov, file= "df_markov.rda")
+save(df_markov, file= "/home/Vera_Weidmann/Supermarket/00_Data/df_markov.rda")
 ```
 
 
