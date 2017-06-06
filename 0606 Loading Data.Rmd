@@ -1,0 +1,73 @@
+---
+title: "Instacart Market"
+author: "Vera"
+date: "19 5 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Instacart Market Basket Analysis:
+
+Libraries:
+```{r}
+library(dplyr)
+```
+
+
+Unzio & Get Data:
+```{r}
+aisles <- read.csv(unz("/home/Vera_Weidmann/Instacart/00_Data/aisles.csv.zip", "aisles.csv"), stringsAsFactors = FALSE)
+
+departments <- read.csv(unz("/home/Vera_Weidmann/Instacart/00_Data/departments.csv.zip", "departments.csv"), stringsAsFactors = FALSE)
+
+order_products_prior <- read.csv(unz("/home/Vera_Weidmann/Instacart/00_Data/order_products__prior.csv.zip", "order_products__prior.csv"), stringsAsFactors = FALSE)
+
+order_products_train <- read.csv(unz("/home/Vera_Weidmann/Instacart/00_Data/order_products__train.csv.zip", "order_products__train.csv"), stringsAsFactors = FALSE)
+
+orders <- read.csv(unz("/home/Vera_Weidmann/Instacart/00_Data/orders.csv.zip", "orders.csv"), stringsAsFactors = FALSE)
+
+products <- read.csv(unz("/home/Vera_Weidmann/Instacart/00_Data/products.csv.zip", "products.csv"), stringsAsFactors = FALSE)
+
+#sample_submission <- read.csv(unz("/home/Vera_Weidmann/Instacart/00_Data/sample_submission.csv.zip", "sample_submission.csv"), stringsAsFactors = FALSE)
+
+```
+
+```{r}
+dim(order_products__prior)
+dim(order_products__train)
+order_products <- rbind(order_products__prior, order_products__train)
+```
+
+```{r}
+tmp <- order_products %>%
+  left_join(products,by="product_id") %>%
+  left_join(aisles,by="aisle_id") %>%
+  left_join(departments,by="department_id")
+
+head(tmp)
+
+tmp2 <- order_products %>%
+  left_join(order,by= c("order_id", "product_id"))
+head(tmp2)
+```
+
+
+#Merging Data:
+```{r}
+order_products <- rbind(order_products_prior,order_products_train, sort=FALSE) 
+products <- merge(products,aisles, x.by="aisle_id",sort=FALSE) 
+products <- merge(products, departments,x.by="department_id", sort=FALSE) 
+#pro <- pro[,-c(1,2)] 
+#rm(ais) 
+#rm(dep) 
+#oppr <- merge(oppr, ord, x.by="order_id", sort=FALSE) 
+df <- merge(order_products, orders, x.by = "order_id", sort = F)
+df <- merge(df, products, x.by = "product_id", sort = F)
+View(df)
+save(df, file = "~/Instacart/00_Data/dfsupermarket.rda")
+```
+
+

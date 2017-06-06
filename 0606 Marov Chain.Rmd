@@ -1,0 +1,75 @@
+---
+title: "Supermarket"
+author: "Vera"
+date: "6 6 2017"
+output: html_document
+---
+
+Libraries:
+```{r, message=FALSE}
+library(dplyr)
+```
+
+Data:
+```{r}
+#load("dfsupermarket.rda") #train and prior data merged all tables
+load("order.rda") #order table including train, prior and test data
+load("test_orders.rda") #just test data
+load("df_marovchaindata.rda") #data for marovchain modeling
+head(df)
+```
+
+Creating a test dataset from table orders
+```{r}
+#test_orders <- orders %>%
+#  filter (eval_set == "test")
+#test_orders <- test_orders[,c(1,2,4)]
+#save(test_orders, file = "test_orders.rda")
+```
+
+Data for Marov chain modeling: user_id, order_number, product_id
+```{r}
+#df <- rbind(order_products_prior,order_products_train)
+#df <- left_join(df, orders, by = "order_id", sort = F)
+#df <- df[,c("user_id", "order_number","product_id")]
+head(df)
+```
+
+
+
+#Non-personalized Markov chain
+
+One-next-step-thingy
+```{r}
+df <- df %>%
+  arrange(user_id, order_number)
+
+#subset for user1:
+df_user1 <- df %>%
+  filter (user_id == 1)
+
+save(df_user1, file = "df_user1.rda")
+
+
+
+df <- as.data.frame(matrix(ncol=2))  for (j in df_user1$order_number) { 
+  if (j ==max(df_user1$order_number)) {break}   
+  vector1 <- df_user1$product_id[df_user1$user_id==i & df_user1$order_number==j]   
+  vector2 <- df_user1$product_id[df_user1$user_id==i & df_user1$order_number==j+1]        
+  tmp <- cbind(rep(vector1,each=length(vector2)), rep(vector2,length(vector1))) 
+  
+df <- rbind(df,tmp)  } df <- df[-1,] df <- df %>% 
+  group_by(V1,V2) %>% 
+  summarise(n=n()) %>% 
+  mutate(p=n/max(n)) %>% dcast(V1 ~ V2, value.var="p") 
+
+df[is.na(df)] = 0 
+rownames(df) <- df[,1] df <- df[,-1] 
+
+testvector <- df_user1$product_id[df_user1$user_id==1 & df_user1$order_number==11] 
+test <- df[as.numeric(testvector),]
+```
+
+
+Notes for later:
+* combine sales from same day, same user
