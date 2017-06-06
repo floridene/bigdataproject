@@ -1,0 +1,67 @@
+---
+title: "Supermarket Basket Analysis"
+author: "Vera"
+date: "19 5 2017"
+output: html_document
+---
+
+Libraries:
+```{r, message=F}
+library(dplyr)
+```
+
+
+Unzio & Get Data:
+```{r}
+aisles <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/aisles.csv.zip", "aisles.csv"), stringsAsFactors = FALSE)
+
+departments <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/departments.csv.zip", "departments.csv"), stringsAsFactors = FALSE)
+
+order_products_prior <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/order_products__prior.csv.zip", "order_products__prior.csv"), stringsAsFactors = FALSE)
+
+order_products_train <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/order_products__train.csv.zip", "order_products__train.csv"), stringsAsFactors = FALSE)
+
+orders <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/orders.csv.zip", "orders.csv"), stringsAsFactors = FALSE)
+
+products <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/products.csv.zip", "products.csv"), stringsAsFactors = FALSE)
+
+#sample_submission <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/sample_submission.csv.zip", "sample_submission.csv"), stringsAsFactors = FALSE)
+
+```
+
+###Merging Data:
+```{r}
+order_products <- rbind(order_products_prior, order_products_train)
+
+df_total <- order_products %>%
+  left_join(products, by= "product_id") %>%
+  left_join(aisles,by="aisle_id") %>%
+  left_join(departments,by="department_id") %>% 
+  left_join(orders, by="order_id")
+
+#Check: should be same number of rows
+dim(order_products)
+dim(df_total)
+
+save(df_total, file ="df_total.rda")
+```
+
+Creating a test dataset from table orders
+```{r}
+test_orders <- orders %>%
+  filter (eval_set == "test")
+test_orders <- test_orders[,c(1,2,4)]
+
+save(test_orders, file = "test_orders.rda")
+```
+
+Data for Markov chain modeling: user_id, order_number, product_id
+```{r}
+df_markov <- rbind(order_products_prior,order_products_train)
+df_markov <- left_join(df_markov, orders, by = "order_id", sort = F)
+df_markov <- df_markov[,c("user_id", "order_number","product_id")]
+
+save(df_markov, file= "df_markov.rda")
+```
+
+

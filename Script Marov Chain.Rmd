@@ -1,0 +1,71 @@
+---
+title: "Supermarket Basket Analysis"
+author: "Vera"
+date: "6 6 2017"
+output: html_document
+---
+
+This script is for the markov chain analysis
+
+Notes for later:
+* combine sales from same day, same user
+
+Libraries:
+```{r, message=FALSE}
+library(dplyr)
+library(reshape2)
+```
+
+Load Data:
+-> For Changing or creating new rda files, pls, use the following script: "xxxx Loading Data.rmd"
+```{r}
+load("df_markov.rda")
+```
+
+
+#Non-personalized Markov chain
+
+One-next-step-thingy
+```{r}
+#order df_markov
+df_markov <- df_markov %>%
+  arrange(user_id, order_number)
+
+#subset for user1:
+df_user1 <- df_markov %>%
+  filter (user_id == 1)
+
+save(df_user1, file = "df_user1.rda")
+```
+
+
+```{r}
+markov_data <- as.data.frame(matrix(ncol=2))  
+
+i = 1 #user_id
+j = 1 #order_number
+
+for (j in df_user1$order_number) { 
+  if (j == max(df_user1$order_number)) {break}   
+  vector1 <- df_user1$product_id[df_user1$user_id==i & df_user1$order_number==j]   
+  vector2 <- df_user1$product_id[df_user1$user_id==i & df_user1$order_number==j+1]        
+  tmp <- cbind(rep(vector1,each=length(vector2)), rep(vector2,length(vector1))) 
+  markov_data <- rbind(markov_data,tmp)  } 
+
+markov_data <- markov_data[-1,] 
+markov_data <- markov_data %>% 
+  group_by(V1,V2) %>% 
+  summarise(n=n()) %>% 
+  mutate(p=n/max(n)) %>% dcast(V1 ~ V2, value.var="p") 
+
+markov_data[is.na(markov_data)] = 0 
+rownames(markov_data) <- markov_data[,1] 
+markov_data <- markov_data[,-1] 
+
+#test
+#testvector <- df_user1$product_id[df_user1$user_id==1 & df_user1$order_number==11] 
+#test <- df[as.numeric(testvector),]
+```
+
+
+
