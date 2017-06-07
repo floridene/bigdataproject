@@ -43,3 +43,5 @@ for (i in unique(data$user_id)){
   r=r+1
 }
 
+save(results, file= "/home/Vera_Weidmann/Supermarket/00_Data/07062017_results_markov.rda")
+save(df, file= "/home/Vera_Weidmann/Supermarket/00_Data/07062017_df_markov_matrix.rda")
