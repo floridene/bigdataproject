@@ -60,8 +60,15 @@ Data for Markov chain modeling: user_id, order_number, product_id
 df_markov <- rbind(order_products_prior,order_products_train)
 df_markov <- left_join(df_markov, orders, by = "order_id", sort = F)
 df_markov <- df_markov[,c("user_id", "order_number","product_id")]
-
 save(df_markov, file= "/home/Vera_Weidmann/Supermarket/00_Data/df_markov.rda")
+
+# previous purchase as our trainset
+df_train_markov <- left_join(order_products_prior, orders, by = "order_id", sort = F)
+save(df_train_markov, file= "/home/Vera_Weidmann/Supermarket/00_Data/df_train_markov.rda")
+
+# last purchase as our validation set
+df_vali_markov <- left_join(order_products_train, orders, by = "order_id", sort = F)
+save(df_vali_markov, file= "/home/Vera_Weidmann/Supermarket/00_Data/df_vali_markov.rda")
 ```
 
 

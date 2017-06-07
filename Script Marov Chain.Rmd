@@ -9,6 +9,7 @@ This script is for the markov chain analysis
 
 Notes for later:
 * combine sales from same day, same user
+* predict how many products will be bought by using predictors day, hour and new feature: how many products had been in the last purchase
 
 Libraries:
 ```{r, message=FALSE}
@@ -17,9 +18,18 @@ library(reshape2)
 ```
 
 Load Data:
--> For Changing or creating new rda files, pls, use the following script: "xxxx Loading Data.rmd"
+-> For Changing or creating new rda files, pls, use the following script: "Script Loading Data.rmd"
 ```{r}
-load("/home/Vera_Weidmann/Supermarket/00_Data/df_markov.rda")
+load("/home/Vera_Weidmann/Supermarket/00_Data/df_markov.rda") #gemerged
+load("/home/Vera_Weidmann/Supermarket/00_Data/df_vali_markov.rda") #train
+load("/home/Vera_Weidmann/Supermarket/00_Data/df_train_markov.rda") #prior
+
+df_train_markov <- df_markov %>%
+  arrange(user_id, order_number)
+df_vali_markov <- df_markov %>%
+  arrange(user_id, order_number)
+df_markov <- df_markov %>%
+  arrange(user_id, order_number)
 ```
 
 
@@ -27,45 +37,74 @@ load("/home/Vera_Weidmann/Supermarket/00_Data/df_markov.rda")
 
 One-next-step-thingy
 ```{r}
-#order df_markov
-df_markov <- df_markov %>%
-  arrange(user_id, order_number)
-
 #subset for user1:
-df_user1 <- df_markov %>%
-  filter (user_id == 1)
+#df_user1 <- df_markov %>%
+ # filter (user_id == 1)
 
-save(df_user1, file = "/home/Vera_Weidmann/Supermarket/00_Data/df_user1.rda")
+#save(df_user1, file = "/home/Vera_Weidmann/Supermarket/00_Data/df_user1.rda")
 ```
 
+
+creation of transition matrix
+```{r}
+#set the data to name x
+data <- df_train_markov
+df <- as.data.frame(matrix(ncol=2))
+
+for (i in unique(data$user_id)){
+  x <- data %>% filter(user_id==i)
+  for (j in unique(x$order_number)) {
+    if (j ==max(x$order_number)) {break}
+    
+    vector1 <- x$product_id[x$order_number==j]
+    vector2 <- x$product_id[x$order_number==j+1]
+    
+    tmp <- cbind(rep(vector1,each=length(vector2)), rep(vector2,length(vector1)))
+    df <- rbind(df,tmp)
+    print(paste(i,j,sep=" "))
+  }
+}
+
+
+df <- df[-1,] %>% group_by(V1,V2) %>% summarise(n=n()) %>% mutate(p=n/max(n)) %>% dcast(V1 ~ V2, value.var="p")
+df[is.na(df)] = 0
+```
+
+mean basketsize per customer, replace with model later
 
 ```{r}
-markov_data <- as.data.frame(matrix(ncol=2))  
-
-i = 1 #user_id
-j = 1 #order_number
-
-for (j in df_user1$order_number) { 
-  if (j == max(df_user1$order_number)) {break}   
-  vector1 <- df_user1$product_id[df_user1$user_id==i & df_user1$order_number==j]   
-  vector2 <- df_user1$product_id[df_user1$user_id==i & df_user1$order_number==j+1]        
-  tmp <- cbind(rep(vector1,each=length(vector2)), rep(vector2,length(vector1))) 
-  markov_data <- rbind(markov_data,tmp)  } 
-
-markov_data <- markov_data[-1,] 
-markov_data <- markov_data %>% 
-  group_by(V1,V2) %>% 
-  summarise(n=n()) %>% 
-  mutate(p=n/max(n)) %>% dcast(V1 ~ V2, value.var="p") 
-
-markov_data[is.na(markov_data)] = 0 
-rownames(markov_data) <- markov_data[,1] 
-markov_data <- markov_data[,-1] 
-
-#test
-#testvector <- df_user1$product_id[df_user1$user_id==1 & df_user1$order_number==11] 
-#test <- df[as.numeric(testvector),]
+#whats the mean n of user?
+user_means <- data %>% group_by(user_id,order_number) %>% summarise(n=n()) %>% summarise(m=mean(n)) %>% round(0)
 ```
 
+```{r}
+#initializing global variables
+results <- as.data.frame(matrix(ncol=2))
+r <- 1
+qual <- as.vector(0)
 
 
+y <- df_vali_markov
+
+
+
+for (i in unique(data$user_id)){
+  trainvector <- data$product_id[(x$order_number==max(x$order_number) & x$user_id==i)] #last basket for user i in data
+  
+  predictions <- df[df$V1 %in% trainvector,-1] %>% colMeans() %>% sort(decreasing=TRUE)
+
+  preds <- names(predictions[1:user_means$m[user_means$user_id==i]]) #cutting predictions at the estimated length
+  
+  controlvector <- y$product_id[y$user_id==i] #validation set
+
+  qual[r] <- mean(names(predictions[1:user_means$m[user_means$user_id==i]]) %in% controlvector) * 
+          mean(!controlvector %in% names(predictions[1:user_means$m[user_means$user_id==i]]))
+  
+  
+  results[r,1] <- i
+  results[r,2] <- paste(preds,collapse=" ")
+
+  r=r+1
+}
+hist(qual)
+```
