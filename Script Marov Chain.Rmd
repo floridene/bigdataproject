@@ -20,16 +20,15 @@ library(reshape2)
 Load Data:
 -> For Changing or creating new rda files, pls, use the following script: "Script Loading Data.rmd"
 ```{r}
-load("/home/Vera_Weidmann/Supermarket/00_Data/df_markov.rda") #gemerged
-load("/home/Vera_Weidmann/Supermarket/00_Data/df_vali_markov.rda") #train
-load("/home/Vera_Weidmann/Supermarket/00_Data/df_train_markov.rda") #prior
+load("/home/Vera_Weidmann/Supermarket/00_Data/df_prior_markov.rda")
+df_prior_markov <- df_prior_markov %>%
+  arrange(user_id, order_number)
+```
 
-df_train_markov <- df_markov %>%
-  arrange(user_id, order_number)
-df_vali_markov <- df_markov %>%
-  arrange(user_id, order_number)
-df_markov <- df_markov %>%
-  arrange(user_id, order_number)
+```{r}
+#testing data for just 20 people
+#df_prior_markov <- df_prior_markov %>%
+#  filter (user_id %in% 1:20)
 ```
 
 
@@ -93,7 +92,6 @@ qual <- as.vector(0)
 #y <- df_user5_train
 
 
-i = 4
 for (i in unique(data$user_id)){
   x <- data %>% filter(user_id==i)
   trainvector <- x$product_id[(x$order_number==max(x$order_number))] #last basket for user i in data
