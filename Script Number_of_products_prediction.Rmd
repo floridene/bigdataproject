@@ -14,6 +14,8 @@ Predict: How many products will be in the next basket :)
 ```{r}
 library(dplyr)
 library(data.table)
+load("/home/Vera_Weidmann/Supermarket/00_Data/df_markov.rda")
+orders <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/orders.csv.zip", "orders.csv"), stringsAsFactors = FALSE)
 ```
 
 ```{r}
@@ -38,9 +40,10 @@ dim(orders)
 orders <- merge(orders, feature_nproducts, x.by = c("user_id", "order_number"), sort = F, all.x = T)
 dim(orders)
 
+orders <- orders %>% arrange(user_id,order_number)
+orders$prior_basket[2:3421083] <- orders$n_products
+orders <- orders %>% filter(order_number!=1)
 ```
-
-
 
 Preparation for modeling & CV:
 Splitting the orders into a train, validation (for cv) and test (prediction)
@@ -59,4 +62,40 @@ orders_test <- orders %>%
 ```
 
 MODEL!
+
+```{r}
+library(rpart)
+library(Metrics)
+library(randomForest)
+tree <- rpart(n_products~.,data=orders_CVtrain[,c(5,6,7,8,9)])
+treepreds <- predict(tree,orders_CVvali[,c(5,6,7,9)])
+
+#mean
+user_means <- orders_CVtrain %>% group_by(user_id) %>% summarise(m=mean(n_products)) %>% round(0)
+orders_CVvali <- merge(orders_CVvali,user_means,x.by="user_id", all.x=T)
+
+sqrt(mse(orders_CVvali[,8],treepreds)) #tree mse
+sqrt(mse(orders_CVvali[,8],orders_CVvali[,10])) #mean mse
+
+orders_CVtrain$user_id <- as.factor(orders_CVtrain$user_id)
+orders_CVvali$user_id <- as.factor(orders_CVvali$user_id)
+
+
+lm <- lm(n_products~.,data=orders_CVtrain[,c(5,6,7,8,9)])
+lmpreds <- round(predict(lm, orders_CVvali[,c(5,6,7,9)]),0)
+
+sqrt(mse(orders_CVvali[,8],lmpreds)) #lm mse
+
+
+
+library(e1071)
+
+orders_CVtrain$n_asfactor <- as.factor(orders_CVtrain$n_products)
+orders_CVvali$n_asfactor <- as.factor(orders_CVvali$n_products)
+
+nb <- naiveBayes(n_asfactor~.,data=orders_CVtrain[,c(1,5,6,7,9,10)])
+nbpreds <- predict(nb, orders_CVvali[,c(1,5,6,7,9,11)])
+nbpreds <- as.integer(as.character(nbpreds))
+sqrt(mse(orders_CVvali[,8],nbpreds)) #nb mse
+```
 
