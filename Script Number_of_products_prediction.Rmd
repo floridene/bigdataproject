@@ -1,0 +1,62 @@
+---
+title: "Supermarket Basket Analysis"
+author: "Vera"
+date: "7 6 2017"
+output: html_document
+---
+
+Predict: How many products will be in the next basket :)
+
+* Create a new feature: Number of products from the previous basket.
+* Using predictors as 
+
+
+```{r}
+library(dplyr)
+library(data.table)
+```
+
+```{r}
+head(orders)
+```
+
+Create a new feature:
+```{r}
+head(df_user1)
+```
+
+```{r}
+#new lookuptable
+feature_nproducts <- df_markov %>%
+  group_by(user_id, order_number) %>%
+  summarise(n_products=n())
+
+(feature_nproducts <- data.table((feature_nproducts)))
+
+#left_join:
+dim(orders)
+orders <- merge(orders, feature_nproducts, x.by = c("user_id", "order_number"), sort = F, all.x = T)
+dim(orders)
+
+```
+
+
+
+Preparation for modeling & CV:
+Splitting the orders into a train, validation (for cv) and test (prediction)
+```{r}
+orders_CVtrain <- orders %>%
+  filter (eval_set == "prior")
+
+orders_CVvali <- orders %>%
+  filter (eval_set == "train")
+
+orders_train <- orders %>%
+  filter (eval_set != "test")
+
+orders_test <- orders %>%
+  filter (eval_set == "test")
+```
+
+MODEL!
+
