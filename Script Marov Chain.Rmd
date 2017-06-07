@@ -37,9 +37,14 @@ df_markov <- df_markov %>%
 
 One-next-step-thingy
 ```{r}
-#subset for user1:
-#df_user1 <- df_markov %>%
- # filter (user_id == 1)
+#subset for user 1-5:
+#df_user5_prior <- df_prior_markov_usertest %>%
+#  filter (user_id %in% 1:20) %>%
+#  arrange (user_id, order_number)
+
+#df_user5_train <- df_train_markov_us %>%
+#  filter (user_id %in% 1:5) %>%
+ # arrange (user_id, order_number)
 
 #save(df_user1, file = "/home/Vera_Weidmann/Supermarket/00_Data/df_user1.rda")
 ```
@@ -48,7 +53,8 @@ One-next-step-thingy
 creation of transition matrix
 ```{r}
 #set the data to name x
-data <- df_train_markov
+data <- df_prior_markov #train and test people
+#data = df_user5_prior
 df <- as.data.frame(matrix(ncol=2))
 
 for (i in unique(data$user_id)){
@@ -83,22 +89,22 @@ results <- as.data.frame(matrix(ncol=2))
 r <- 1
 qual <- as.vector(0)
 
+#y <- df_vali_markov
+#y <- df_user5_train
 
-y <- df_vali_markov
 
-
-
+i = 4
 for (i in unique(data$user_id)){
-  trainvector <- data$product_id[(x$order_number==max(x$order_number) & x$user_id==i)] #last basket for user i in data
-  
+  x <- data %>% filter(user_id==i)
+  trainvector <- x$product_id[(x$order_number==max(x$order_number))] #last basket for user i in data
   predictions <- df[df$V1 %in% trainvector,-1] %>% colMeans() %>% sort(decreasing=TRUE)
 
   preds <- names(predictions[1:user_means$m[user_means$user_id==i]]) #cutting predictions at the estimated length
   
-  controlvector <- y$product_id[y$user_id==i] #validation set
+  #controlvector <- y$product_id[y$user_id==i] #validation set
 
-  qual[r] <- mean(names(predictions[1:user_means$m[user_means$user_id==i]]) %in% controlvector) * 
-          mean(!controlvector %in% names(predictions[1:user_means$m[user_means$user_id==i]]))
+  #qual[r] <- mean(names(predictions[1:user_means$m[user_means$user_id==i]]) %in% controlvector) * 
+ #         mean(!controlvector %in% names(predictions[1:user_means$m[user_means$user_id==i]]))
   
   
   results[r,1] <- i
@@ -106,5 +112,5 @@ for (i in unique(data$user_id)){
 
   r=r+1
 }
-hist(qual)
+#hist(qual)
 ```

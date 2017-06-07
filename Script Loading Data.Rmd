@@ -50,7 +50,7 @@ Creating a test dataset from table orders
 ```{r}
 test_orders <- orders %>%
   filter (eval_set == "test")
-test_orders <- test_orders[,c(1,2,4)]
+#test_orders <- test_orders[,c(1,2,4)]
 
 save(test_orders, file = "/home/Vera_Weidmann/Supermarket/00_Data/test_orders.rda")
 ```
@@ -63,12 +63,21 @@ df_markov <- df_markov[,c("user_id", "order_number","product_id")]
 save(df_markov, file= "/home/Vera_Weidmann/Supermarket/00_Data/df_markov.rda")
 
 # previous purchase as our trainset
-df_train_markov <- left_join(order_products_prior, orders, by = "order_id", sort = F)
-save(df_train_markov, file= "/home/Vera_Weidmann/Supermarket/00_Data/df_train_markov.rda")
+df_prior_markov <- left_join(order_products_prior, orders, by = "order_id", sort = F)
+df_prior_markov <- df_prior_markov[,c("user_id", "order_number","product_id")]
+save(df_prior_markov, file= "/home/Vera_Weidmann/Supermarket/00_Data/df_prior_markov.rda")
 
 # last purchase as our validation set
-df_vali_markov <- left_join(order_products_train, orders, by = "order_id", sort = F)
-save(df_vali_markov, file= "/home/Vera_Weidmann/Supermarket/00_Data/df_vali_markov.rda")
+df_train_markov <- left_join(order_products_train, orders, by = "order_id", sort = F)
+df_train_markov <- df_train_markov[,c("user_id", "order_number","product_id")]
+save(df_train_markov, file= "/home/Vera_Weidmann/Supermarket/00_Data/df_train_markov.rda")
+
+```
+```{r}
+df_prior_markov_usertest <- df_prior_markov %>%
+  filter (user_id %in% test_orders$user_id) %>%
+  arrange(user_id, order_number)
+
 ```
 
 
