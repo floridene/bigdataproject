@@ -49,7 +49,7 @@ boing <- data %>%
   ungroup() %>% 
   filter(!is.na(vector2)) 
 
-save
+save(boing, file = "/home/Vera_Weidmann/Supermarket/00_Data/boing.rda")
 
 # for (i in 1:nrow(boing)){
 #   df <- rbind(df,
