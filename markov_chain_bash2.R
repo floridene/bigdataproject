@@ -13,7 +13,7 @@ boing <- data %>%
   summarise(basket=paste(product_id, collapse=" ")) %>%
   group_by(user_id) %>%
   mutate(vector1= basket %>%
-           strsplit(split = " "), vector2=lead(basket) %>% strsplit(split = " ")) %>%
+  strsplit(split = " "), vector2=lead(basket) %>% strsplit(split = " ")) %>%
   ungroup() %>% 
   filter(!is.na(vector2)) 
 
