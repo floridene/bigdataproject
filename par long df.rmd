@@ -14,6 +14,7 @@ note: we could subset the boing.rda to test only beforehand to decrease calculat
 library(foreach)
 library(doParallel)
 library(dplyr)
+library(data.table)
 load("/home/Vera_Weidmann/Supermarket/00_Data/boing.rda")
 
 num_cores <- detectCores()-10 #number of possible cores - 10, so that others can use them still
@@ -26,7 +27,8 @@ stopCluster(cluster) #cancel cluster
 
 save(longdata, file = "/home/Vera_Weidmann/Supermarket/00_Data/par_longdata.rda")
 
-transMatrix <- longdata %>% group_by(V1,V2) %>% summarise(n=n()) %>% mutate(p=n/max(n)) %>% dcast(V1 ~ V2, value.var="p")
+longdata_table<- data.table(longdata)
+transMatrix <- longdata_table %>% group_by(V1,V2) %>% summarise(n=n()) %>% mutate(p=n/max(n)) %>% dcast(V1 ~ V2, value.var="p")
 transMatrix[is.na(transMatrix)] = 0
 
 save(transMatrix, file = "/home/Vera_Weidmann/Supermarket/00_Data/transMatrix.rda")
