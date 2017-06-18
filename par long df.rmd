@@ -5,10 +5,12 @@ date: "9 6 2017"
 output: html_document
 ---
 
+changelog:
+18.06 Added section to run longdata and markovchain on only test users
 creation of the transition matrix for all users by parallel computing. 
 note: we could subset the boing.rda to test only beforehand to decrease calculation time
 
-```{r}
+```{r warning=FALSE, fig.width=8,fig.height=6}
 #install.packages("foreach")
 #install.packages("doParallel")
 library(foreach)
@@ -27,14 +29,56 @@ stopCluster(cluster) #cancel cluster
 
 save(longdata, file = "/home/Vera_Weidmann/Supermarket/00_Data/par_longdata.rda")
 
-longdata_table<- data.table(longdata)
+longdata_table<- data.table(longdata[1:1000,])
 transMatrix <- longdata_table %>% group_by(V1,V2) %>% summarise(n=n()) %>% mutate(p=n/max(n)) %>% dcast(V1 ~ V2, value.var="p")
-transMatrix[is.na(transMatrix)] = 0
+#transMatrix[is.na(transMatrix)] = 0
 
-save(transMatrix, file = "/home/Vera_Weidmann/Supermarket/00_Data/transMatrix.rda")
+numberNA <- cbind.data.frame(n=1:ncol(transMatrix),m=colMeans(is.na(transMatrix[-1,])))
 
+ggplot(numberNA[-1,], aes(n,m))+geom_line(size=0.1)+ylab("Sparsity")+annotate("text",x=nrow(numberNA)/2,y=0.6,label=paste("Maximum sparsity at:",as.character(max(numberNA$m))))
+#save(transMatrix, file = "/home/Vera_Weidmann/Supermarket/00_Data/transMatrix.rda")
+load("/home/Vera_Weidmann/Supermarket/00_Data/transMatrix.rda")
 ```
 
 
+```{r}
+load("/home/Vera_Weidmann/Supermarket/00_Data/par_longdata.rda")
+library(markovchain)
+TransMC <- as.data.frame(markovchainFit(longdata_table)$estimate@transitionMatrix)
+save(TransMC, file="/home/Vera_Weidmann/Supermarket/00_Data/TransMC.rda")
+
+```
+
+#working on test only
+```{r}
+library(foreach)
+library(doParallel)
+library(markovchain)
+
+load("/home/Vera_Weidmann/Supermarket/00_Data/test_orders.rda")
+load("/home/Vera_Weidmann/Supermarket/00_Data/boing.rda")
+boing_test <- boing[boing$user_id %in% test_orders$user_id,]
+rm(boing)
+rm(test_orders)
+save(boing_test, file="/home/Vera_Weidmann/Supermarket/00_Data/boing_test.rda")
+
+#load("/home/Vera_Weidmann/Supermarket/00_Data/boing_test.rda")
+num_cores <- detectCores()-10 #number of possible cores - 10, so that others can use them still
+cluster <- makeCluster(num_cores) #creating cluster
+registerDoParallel(cluster) #initializing cluster
+
+#added user_id to the longdata df for use of markov chain later on
+longdata_test <- foreach(row=1:nrow(boing_test), .combine=rbind) %dopar% cbind(rep(boing_test$vector1[[row]],                                                                                   each=length(boing_test$vector2[[row]])),rep(boing_test$vector2[[row]],length(boing_test$vector1[[row]])),                                                                          rep(boing_test$user_id[row],length.out=length(boing_test$vector2[[row]])*length(boing_test$vector1[[row]])))
+
+stopCluster(cluster) #cancel cluster
+
+longdata_test <- as.data.frame(longdata_test)
+save(longdata_test, file = "/home/Vera_Weidmann/Supermarket/00_Data/par_longdata_test.rda")
+
+#load("/home/Vera_Weidmann/Supermarket/00_Data/par_longdata_test.rda")
+TransMC_test <- as.data.frame(markovchainFit(longdata_test[,-3])$estimate@transitionMatrix)
+save(TransMC_test, file="/home/Vera_Weidmann/Supermarket/00_Data/TransMC_test.rda")
+
+```
 
 
