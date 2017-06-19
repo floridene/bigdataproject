@@ -1,0 +1,84 @@
+---
+title: "Install Spark"
+author: "Vera"
+date: "Summer Term 2017"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+---
+
+## Big Data Project
+by Ceyda Ugur, Max Philipp and Vera Weidmann
+
+###1. Setup Spark
+
+####1a. Installation:
+```{r, echo = FALSE, message=FALSE}
+#if (!require("pacman")) install.packages("pacman")
+pacman::p_load(sparklyr,devtools, RCurl, dplyr, ggplot2, DBI, rsparkling, h20)
+```
+```{r, echo = FALSE, message=FALSE}
+#spark_install(version = "1.6.2")
+devtools::install_github("rstudio/sparklyr")
+#options(rsparkling.sparklingwater.version = "1.6.8") #H20
+```
+
+####1b. Connection to Spark:
+```{r}
+sc <- spark_connect(master = "local")
+```
+
+####1c. Copying datasets from R into the Spark cluster:
+```{r}
+#load data & unzip
+aisles <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/aisles.csv.zip", "aisles.csv"), stringsAsFactors = FALSE)
+departments <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/departments.csv.zip", "departments.csv"), stringsAsFactors = FALSE)
+order_products_prior <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/order_products__prior.csv.zip", "order_products__prior.csv"), stringsAsFactors = FALSE)
+order_products_train <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/order_products__train.csv.zip", "order_products__train.csv"), stringsAsFactors = FALSE)
+orders <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/orders.csv.zip", "orders.csv"), stringsAsFactors = FALSE)
+products <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/products.csv.zip", "products.csv"), stringsAsFactors = FALSE)
+
+#copy in spark:
+orders_tbl <- copy_to(sc, orders, overwrite = T)
+products_tbl <- copy_to(sc, products, overwrite = T)
+aisles_tbl <- copy_to(sc, aisles, overwrite = T)
+departments_tbl <- copy_to(sc, departments, overwrite = T)
+op_prior_tbl <- copy_to(sc, order_products_prior, overwrite = T)
+op_train_tbl <- copy_to(sc, order_products_train, overwrite = T)
+
+src_tbls(sc)
+```
+
+
+###2. Visualizations by using SQL Statements
+
+```{r, message=F}
+(orders_2 <- dbGetQuery(sc, "SELECT sum(order_id) as total_orders, eval_set FROM orders group by eval_set"))
+ggplot(orders_2, aes(y=total_orders, x=eval_set)) + geom_bar(stat = "identity")
+
+
+#ist(orders_2$total_orders)
+```
+
+
+
+###3. Deep Learning (H20)
+```{r}
+head(sc, orders)
+```
+
+
+
+###4. Markov Chain
+
+
+
+
+------------------------------------
+```{r}
+spark_disconnect(sc)
+```
+
+
