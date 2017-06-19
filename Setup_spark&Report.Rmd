@@ -8,9 +8,17 @@ output:
     toc_float: true
     toc_depth: 4
 ---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
 ## Big Data Project
 by Ceyda Ugur, Max Philipp and Vera Weidmann
+
+
+Notes:
+* Apriori algorithm for basket analysis
+
 
 ###1. Setup Spark
 
@@ -66,7 +74,12 @@ ggplot(orders_2, aes(y=total_orders, x=eval_set)) + geom_bar(stat = "identity")
 
 ###3. Deep Learning (H20)
 ```{r}
-head(sc, orders)
+path <- system.file("extdata", "prostate.csv", package = "h2o")
+prostate_df <- spark_read_csv(sc, "prostate", path)
+head(prostate_df)
+
+prostate_hf <- as_h2o_frame(sc, prostate_df, strict_version_check = FALSE)
+splits <- h2o.splitFrame(prostate_hf, seed = 1)
 ```
 
 
