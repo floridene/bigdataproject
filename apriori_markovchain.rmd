@@ -7,16 +7,24 @@ output: html_document
 
 ```{r}
 library(arulesViz)
-load("/home/Vera_Weidmann/Supermarket/00_Data/df_total.rda")
-load("/home/Vera_Weidmann/Supermarket/00_Data/test_orders.rda")
-df_test_only <- df_total[df_total$user_id %in% test_orders$user_id,]
-rm(df_total)
-rm(test_orders)
-save(df_test_only, file="/home/Vera_Weidmann/Supermarket/00_Data/df_test_only.rda")
-
+load("/home/Vera_Weidmann/Supermarket/00_Data/boing_test.rda")
+boing_test <-boing_test$vector1
 ```
 
 ```{r}
-rules <- apriori(df_test_only[,c("order_id","product_name")])
+trans <- as(boing_test, "transactions")
+rules <- apriori(trans,parameter=list(supp=0.000015, conf=0.6,target="rules"))
+rules.df <- as(rules, "data.frame")
+splitted <- lapply(strsplit(as.character(rules.df$rules)," => ", fixed=TRUE),function(x){
+  strsplit( gsub("[{}]","",x),", ",fixed=TRUE)
+})
+#write(rules, file="/home/Vera_Weidmann/Supermarket/00_Data/rules_e4_04")
+#plot(rules)
+```
+
+```{r}
+options (digits=2) # Show the top 5 rules, but only 2 digits
+
+inspect (rules[1:5])
 ```
 
