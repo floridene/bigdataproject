@@ -5,42 +5,62 @@ date: "23 6 2017"
 output: html_document
 ---
 
-```{r}
+```{r warning=FALSE,message=FALSE}
 library(arulesViz)
 load("/home/Vera_Weidmann/Supermarket/00_Data/boing_test.rda")
-boing_test <-boing_test$vector1
+final_orders <- boing_test %>% group_by(user_id) %>% filter(order_number==max(order_number)) %>% select(user_id,basket, vector1)
 ```
 
 ```{r}
-trans <- as(boing_test, "transactions")
-rules <- apriori(trans,parameter=list(supp=0.000015, conf=0.6,target="rules"))
+trans <- as(boing_test$vector1, "transactions")
+allitems <- as.data.frame(as.character(unique(unlist(boing_test)))) #all unique items
+colnames(allitems) <- "items" 
+
+rm(boing_test)
+rules <- apriori(trans,parameter=list(supp=0.000014, conf=0.5,target="rules")) #create apriori rules, confidence 60% as threshold
 ```
 
 ```{r}
-allitems <- as.data.frame(as.character(unique(unlist(boing_test))))
-colnames(allitems) <- "items"
 
-basket <- c("41046", "10125", "38026")
+basket <- c("39190", "47766", "21903", "43961", "17668") #a test basket
+rules.sub <- subset(rules, subset = lhs %in% basket)
+rules.sub <- subset(rules, subset = !lhs %in% as.character(allitems[!allitems$items %in% basket,1])) #all apriori rules which are based only on the basket
 
-
-rules.sub <- subset(rules, subset = (lhs %in% 
-    basket & !lhs %in% allitems[!allitems$items %in% basket,1])) 
-```
-
-
-```{r}
-rules.df <- as(rules, "data.frame")
-splitted <- lapply(strsplit(as.character(rules.df$rules)," => ", fixed=TRUE),function(x){
-  strsplit( gsub("[{}]","",x),", ",fixed=TRUE)
-})
-#write(rules, file="/home/Vera_Weidmann/Supermarket/00_Data/rules_e4_04")
-#plot(rules)
-```
-
-
-```{r}
-options (digits=2) # Show the top 5 rules, but only 2 digits
-
+options (digits=2)
 inspect (rules.sub)
+
+as(inspect(rules.sub), "data.frame")$rhs
+preds <- unique(gsub("[{}]","",as(inspect(rules.sub), "data.frame")$rhs))
+newbasket <- unique(c(basket,preds))
+
 ```
+
+```{r}
+#whats the mean n of user?
+user_means <- data %>% group_by(user_id,order_number) %>% summarise(n=n()) %>% summarise(m=mean(n)) %>% round(0)
+```
+
+```{r}
+load("/home/Vera_Weidmann/Supermarket/00_Data/par_longdata_test.rda")
+library(markovchain) 
+
+user=6
+
+TransMC <- as.data.frame(markovchainFit(longdata_test %>% filter(V3==user))$estimate@transitionMatrix) 
+basket <- unlist(final_orders[final_orders$user_id==user,3])
+preds <- TransMC[basket,] %>% colMeans() %>% sort(decreasing=TRUE)
+
+preds.names <- names(preds[preds>0]) # cut preds
+rules.sub <- subset(rules, subset = !lhs %in% as.character(allitems[!allitems$items %in% preds.names,1]))
+
+rhs.desc <- as(inspect(rules.sub), "data.frame")[,-2] %>% arrange(-confidence) %>% select(rhs)
+final.prediction <- unique(gsub("[{}]","",rhs.desc$rhs))
+newbasket <- unique(c(basket,preds))
+```
+
+
+
+
+
+
 
