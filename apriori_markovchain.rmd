@@ -14,6 +14,21 @@ boing_test <-boing_test$vector1
 ```{r}
 trans <- as(boing_test, "transactions")
 rules <- apriori(trans,parameter=list(supp=0.000015, conf=0.6,target="rules"))
+```
+
+```{r}
+allitems <- as.data.frame(as.character(unique(unlist(boing_test))))
+colnames(allitems) <- "items"
+
+basket <- c("41046", "10125", "38026")
+
+
+rules.sub <- subset(rules, subset = (lhs %in% 
+    basket & !lhs %in% allitems[!allitems$items %in% basket,1])) 
+```
+
+
+```{r}
 rules.df <- as(rules, "data.frame")
 splitted <- lapply(strsplit(as.character(rules.df$rules)," => ", fixed=TRUE),function(x){
   strsplit( gsub("[{}]","",x),", ",fixed=TRUE)
@@ -22,9 +37,10 @@ splitted <- lapply(strsplit(as.character(rules.df$rules)," => ", fixed=TRUE),fun
 #plot(rules)
 ```
 
+
 ```{r}
 options (digits=2) # Show the top 5 rules, but only 2 digits
 
-inspect (rules[1:5])
+inspect (rules.sub)
 ```
 
