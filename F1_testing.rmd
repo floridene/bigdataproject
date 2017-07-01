@@ -1,0 +1,63 @@
+---
+title: "F1 Testing"
+author: "MP"
+date: "1 7 2017"
+output: html_document
+---
+
+In this code we will test different models for accuracy, using the F1 Score, which is defined in the chunk below. source: https://www.kaggle.com/rafaelmdourado/f1-score-with-r/notebook in the comments by grandmaster Konrad Banachewicz.
+
+```{r F1 Score, message=FALSE, warning=FALSE}
+require(stringr)
+f1score <- function(list_a, list_b)
+{
+  list_a <- str_split(list_a, ' ')[[1]]
+  list_b <- str_split(list_b, ' ')[[1]]
+  x <- length(intersect(list_a, list_b))
+  pr <- x/length(list_b)
+  re <- x/length(list_a)
+  f1 <- 0
+  if (pr + re)
+  {
+    f1 <- 2 * pr * re /(pr  +re)
+  }
+  return(f1)
+}
+```
+
+
+```{r Loading Data}
+library(arulesViz)
+library(dplyr)
+library(markovchain)
+load("/home/Vera_Weidmann/Supermarket/00_Data/boing.rda")
+load("/home/Vera_Weidmann/Supermarket/00_Data/test_orders.rda")
+```
+
+here we compute the overall average F1 value, if we would predict the Basket t with Basket t-1
+
+```{r global F1}
+boing <- boing %>% group_by(user_id,order_number) %>% mutate(F1=f1score(vector1,vector2))
+mean(boing$F1)
+```
+The mean F1 score is .17, which is below all kaggle competitors. lets check this again for only train users and there last basket versus the train-basket
+
+```{r subset boing_train}
+boing_train <- boing[!boing$user_id %in% test_orders$user_id,]
+#save(boing_train, file="/home/Vera_Weidmann/Supermarket/00_Data/boing_train.rda")
+```
+
+```{r F1 train}
+tmp <-boing_train %>% group_by(user_id) %>% filter(order_number==max(order_number))
+
+tmp <- tmp %>% mutate(F1=f1score(vector1,vector2))
+
+mean(tmp$F1)
+```
+
+Now we have a baseline, which is around 0.17, all our models and ideas which perform better than 0.17 in f1scores are cosidered valueable :)
+
+```{r}
+
+```
+

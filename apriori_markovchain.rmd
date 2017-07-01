@@ -7,27 +7,28 @@ output: html_document
 
 ```{r warning=FALSE,message=FALSE}
 library(arulesViz)
+library(dplyr)
 load("/home/Vera_Weidmann/Supermarket/00_Data/boing_test.rda")
 final_orders <- boing_test %>% group_by(user_id) %>% filter(order_number==max(order_number)) %>% select(user_id,basket, vector1)
 ```
 
 ```{r}
 trans <- as(boing_test$vector1, "transactions")
-allitems <- as.data.frame(as.character(unique(unlist(boing_test)))) #all unique items
+allitems <- as.data.frame(as.character(unique(unlist(boing_test$vector1)))) #all unique items
 colnames(allitems) <- "items" 
 
 rm(boing_test)
-rules <- apriori(trans,parameter=list(supp=0.000014, conf=0.5,target="rules")) #create apriori rules, confidence 60% as threshold
+rules <- apriori(trans,parameter=list(supp=0.00001, conf=0.5,target="rules",maxtime=30)) #create apriori rules, confidence 60% as threshold
 ```
 
 ```{r}
 
-basket <- c("39190", "47766", "21903", "43961", "17668") #a test basket
+basket <-  #a test basket
 rules.sub <- subset(rules, subset = lhs %in% basket)
 rules.sub <- subset(rules, subset = !lhs %in% as.character(allitems[!allitems$items %in% basket,1])) #all apriori rules which are based only on the basket
 
 options (digits=2)
-inspect (rules.sub)
+inspect (rules.sub[1:10])
 
 as(inspect(rules.sub), "data.frame")$rhs
 preds <- unique(gsub("[{}]","",as(inspect(rules.sub), "data.frame")$rhs))
@@ -44,7 +45,7 @@ user_means <- data %>% group_by(user_id,order_number) %>% summarise(n=n()) %>% s
 load("/home/Vera_Weidmann/Supermarket/00_Data/par_longdata_test.rda")
 library(markovchain) 
 
-user=6
+user=35
 
 TransMC <- as.data.frame(markovchainFit(longdata_test %>% filter(V3==user))$estimate@transitionMatrix) 
 basket <- unlist(final_orders[final_orders$user_id==user,3])
@@ -53,11 +54,14 @@ preds <- TransMC[basket,] %>% colMeans() %>% sort(decreasing=TRUE)
 preds.names <- names(preds[preds>0]) # cut preds
 rules.sub <- subset(rules, subset = !lhs %in% as.character(allitems[!allitems$items %in% preds.names,1]))
 
-rhs.desc <- as(inspect(rules.sub), "data.frame")[,-2] %>% arrange(-confidence) %>% select(rhs)
+rhs.desc <- as(inspect(rules.sub), "data.frame")[,-2] %>% arrange(-confidence) %>% mutate(rhs=gsub("[{}]","",rhs.desc$rhs))
 final.prediction <- unique(gsub("[{}]","",rhs.desc$rhs))
 newbasket <- unique(c(basket,preds))
 ```
 
+```{r}
+
+```
 
 
 
