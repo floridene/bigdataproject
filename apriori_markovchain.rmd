@@ -9,6 +9,7 @@ output: html_document
 library(arulesViz)
 library(dplyr)
 load("/home/Vera_Weidmann/Supermarket/00_Data/boing_test.rda")
+testusers <- unique(boing_test$user_id)
 final_orders <- boing_test %>% group_by(user_id) %>% filter(order_number==max(order_number)) %>% select(user_id,basket, vector1)
 ```
 
@@ -18,7 +19,8 @@ allitems <- as.data.frame(as.character(unique(unlist(boing_test$vector1)))) #all
 colnames(allitems) <- "items" 
 
 rm(boing_test)
-rules <- apriori(trans,parameter=list(supp=0.00001, conf=0.5,target="rules",maxtime=30)) #create apriori rules, confidence 60% as threshold
+gc()
+rules <- apriori(trans,parameter=list(supp=0.00001, conf=0.5,target="rules",maxtime=30)) #create apriori rules, confidence 50% as threshold
 ```
 
 ```{r}
@@ -39,7 +41,83 @@ newbasket <- unique(c(basket,preds))
 ```{r}
 #whats the mean n of user?
 user_means <- data %>% group_by(user_id,order_number) %>% summarise(n=n()) %>% summarise(m=mean(n)) %>% round(0)
+user_means <- test %>% group_by(user_id) %>% summarise(meanbasket=round(max(user_average_basket)))
+
 ```
+
+baskets based on the xgboost
+
+```{r}
+baskets <- test %>%
+  filter(reordered == 1) %>%
+  group_by(user_id) %>%
+  summarise(basket = paste(product_id, collapse = " ")) %>%
+  mutate(basket= basket %>%
+  strsplit(split = " ")) %>%
+  ungroup()
+
+missing <- data.frame(
+  user_id = unique(test$user_id[!test$user_id %in% baskets$user_id]),
+  products = "None"
+)
+
+```
+
+```{r}
+baskets2 <- baskets %>% left_join(user_means, by="user_id") %>% group_by(user_id)
+for (i in 1:nrow(baskets2)){
+baskets2$actual[i] <- length(baskets2$basket[[i]])}
+```
+
+```{r}
+
+getnewpreds <- function(x){
+preds.names <- baskets$basket[[x]]
+rules.sub <- subset(rules, subset = !lhs %in% as.character(allitems[!allitems$items %in% preds.names,1]))
+
+if(is.null(inspect(rules.sub))) {stop()}
+
+rhs.desc <- as(inspect(rules.sub), "data.frame")[,-2] %>% arrange(-confidence) %>% mutate(rhs=gsub("[{}]","",rhs))
+apriori.prediction <- unique(rhs.desc$rhs)
+newbasket <- unique(c(preds.names,apriori.prediction))
+
+return(cbind(baskets$user_id[x],newbasket))
+}
+
+
+library(foreach)
+library(doParallel)
+num_cores <- detectCores()-20 #number of possible cores - 20, so that others can use them still
+cluster <- makeCluster(num_cores) #creating cluster
+registerDoParallel(cluster) #initializing cluster
+
+new <- foreach(row=1:200, .combine=rbind) %dopar% getnewpreds(row)
+
+stopCluster(cluster) #cancel cluster
+```
+
+
+```{r}
+baskets2$withapriori <- baskets2$basket
+
+for (j in 1:1000){
+preds.names <- baskets$basket[[j]]
+rules.sub <- subset(rules, subset = !lhs %in% as.character(allitems[!allitems$items %in% preds.names,1]))
+print(j)
+if(is.null(inspect(rules.sub))) {next}
+rhs.desc <- as(inspect(rules.sub), "data.frame")[,-2] %>% arrange(-confidence) %>% mutate(rhs=gsub("[{}]","",rhs))
+apriori.prediction <- unique(rhs.desc$rhs)
+newbasket <- unique(c(preds.names,apriori.prediction))
+baskets2$withapriori[[j]] <- newbasket
+}
+
+
+baskets2$newactual <- baskets2$actual
+for (i in 1:nrow(baskets2)){
+baskets2$newactual[i] <- length(baskets2$withapriori[[i]])}
+```
+
+
 
 ```{r}
 load("/home/Vera_Weidmann/Supermarket/00_Data/par_longdata_test.rda")
