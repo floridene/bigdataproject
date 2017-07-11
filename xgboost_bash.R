@@ -1,7 +1,10 @@
 
 load("/home/Max_Philipp/bigdataproject/prior_test.rda")
 library(xgboost)
-subtrain <- prior_test %>% sample_frac(0.2)
+library(dplyr)
+library(data.table)
+library(tidyr)
+subtrain <- prior_test %>% sample_frac(0.1)
 X <- xgb.DMatrix(as.matrix(subtrain %>% select(-reordered)), label = subtrain$reordered)
 
 best_param <- list()
