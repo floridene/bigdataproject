@@ -154,8 +154,10 @@ rm(products)
 
 
 ```{r}
+load("prior_test.rda")
 library(xgboost)
-X <- xgb.DMatrix(as.matrix(prior_test %>% select(-reordered)), label = prior_test$reordered)
+subtrain <- prior_test %>% sample_frac(0.2)
+X <- xgb.DMatrix(as.matrix(subtrain %>% select(-reordered)), label = subtrain$reordered)
 ```
 
 
