@@ -1,0 +1,12 @@
+---
+title: "Clustering"
+author: "MP"
+date: "12 7 2017"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+load("product_frequency_per_user.rda")
+```
+

@@ -14,6 +14,7 @@ orderp <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/order_products__
 ordert <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/order_products__train.csv.zip", "order_products__train.csv"), stringsAsFactors = FALSE)
 
 orders <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/orders.csv.zip", "orders.csv"), stringsAsFactors = FALSE)
+testorders <- orders %>% filter(eval_set=="test") %>% select(user_id,order_id)
 
 products <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/products.csv.zip", "products.csv"), stringsAsFactors = FALSE)
 
@@ -141,6 +142,9 @@ prior_test <- prior_test %>% filter(!is.na(days_since_prior_order)) %>% select(-
 ```{r}
 save(prior_test, file="prior_test.rda")
 save(test,file="test.rda")
+load("test.rda")
+write.csv(prior_test, file="prior_test.csv")
+write.csv(test,file="test_prior_test.csv")
 ```
 
 ```{r}
@@ -160,7 +164,7 @@ subtrain <- prior_test %>% sample_frac(0.2)
 X <- xgb.DMatrix(as.matrix(subtrain %>% select(-reordered)), label = subtrain$reordered)
 ```
 
-
+test for best params
 ```{r}
 best_param <- list()
 best_seednumber <- 1234
@@ -218,3 +222,63 @@ for (iter in 1:20) {
 write.csv(best_param, file = "best_parameters_FinalCV.csv")
 
 ```
+
+fitting the best model
+
+```{r}
+subtrain <- prior_test %>% sample_frac(0.1)
+X <- xgb.DMatrix(as.matrix(subtrain %>% select(-reordered)), label = subtrain$reordered)
+param <- list(objective = "binary:logistic",
+                 eval_metric = "logloss",
+                 max_depth = 9,
+                 eta = 0.08910454,
+                 gamma = 0.1459201,
+                 subsample = 0.7306826,
+                 colsample_bytree = 0.6887265,
+                 min_child_weight = 32,
+                 max_delta_step = 8)
+                 
+   cv_nround <- 200
+   cv_nfold <- 5
+
+     mdcv <- xgb.cv(data = X,
+                  params = param,
+                  nfold = cv_nfold,
+                  nrounds = cv_nround,
+                  nthread = 32,
+                  verbose = TRUE,
+                  early_stopping_rounds = 20,
+                  maximize = FALSE
+                  )
+
+Y <- xgb.DMatrix(as.matrix(test))
+test$reordered <- predict(mdcv, Y)
+save(test,file="test_with_preds_xgb1207.rda")
+```
+
+ab hier: preds1207 from h2o distributed random forest 50 trees 5fold
+
+```{r}
+user_average_basket$user_average_basket <- round(as.numeric(user_average_basket$user_average_basket))
+```
+
+```{r}
+test$reordered <- preds1207$p1 #enter predictions here
+
+
+submission <- test %>% 
+  select(-user_average_basket) %>% 
+  inner_join(user_average_basket, by="user_id")%>% 
+  arrange(user_id,-reordered)%>% 
+  group_by(user_id) %>% 
+  mutate(index=row_number()) %>% 
+  filter(index<=user_average_basket) %>% 
+  ungroup() %>% 
+  inner_join(testorders,by="user_id") %>% 
+  select(order_id,product_id) %>%
+  group_by(order_id) %>% 
+  summarise(products = paste(product_id, collapse = " "))
+
+write.csv(submission, file = "sub_drf1_1207.csv", row.names = F)
+```
+
