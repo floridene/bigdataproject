@@ -142,7 +142,7 @@ prior_test <- prior_test %>% filter(!is.na(days_since_prior_order)) %>% select(-
 ```{r}
 save(prior_test, file="prior_test.rda")
 save(test,file="test.rda")
-load("test.rda")
+load("/home/Max_Philipp/bigdataproject/test.rda")
 write.csv(prior_test, file="prior_test.csv")
 write.csv(test,file="test_prior_test.csv")
 ```
@@ -263,7 +263,7 @@ user_average_basket$user_average_basket <- round(as.numeric(user_average_basket$
 ```
 
 ```{r}
-test$reordered <- preds1207$p1 #enter predictions here
+test$reordered <- preds_xgb$reordered #enter predictions here
 
 
 submission <- test %>% 
@@ -279,6 +279,6 @@ submission <- test %>%
   group_by(order_id) %>% 
   summarise(products = paste(product_id, collapse = " "))
 
-write.csv(submission, file = "sub_drf1_1207.csv", row.names = F)
+write.csv(submission, file = "sub_xgb1000rounds_1207.csv", row.names = F)
 ```
 
