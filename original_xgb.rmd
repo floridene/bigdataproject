@@ -199,3 +199,20 @@ submission <- submission %>% bind_rows(missing) %>% arrange(order_id)
 write.csv(submission, file = "sub_xgbori_500_newcutoffs.csv", row.names = F)
 ```
 
+```{r}
+submission <- deepori %>% 
+  filter(predict==1) %>% 
+  group_by(order_id) %>%
+  summarise(
+    products = paste(product_id, collapse = " ")
+  )
+
+missing <- data.frame(
+  order_id = unique(test$order_id[!test$order_id %in% submission$order_id]),
+  products = "None"
+)
+
+submission <- submission %>% bind_rows(missing) %>% arrange(order_id)
+write.csv(submission, file = "sub_deepori.csv", row.names = F)
+```
+
