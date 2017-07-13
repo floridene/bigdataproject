@@ -263,6 +263,11 @@ user_average_basket$user_average_basket <- round(as.numeric(user_average_basket$
 ```
 
 ```{r}
+lookup <- test %>% group_by(user_id) %>% select(user_id,user_reorder_ratio) %>% mutate(index=row_number()) %>% filter(index==1) %>% left_join(user_average_basket, by="user_id") %>% select(-index) %>% mutate(cutoff=round(user_average_basket*user_reorder_ratio))
+save(lookup,file="cutofflookup.rda")
+```
+
+```{r}
 test$reordered <- preds1207$p1 #enter predictions here
 
 
