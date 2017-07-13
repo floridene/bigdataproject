@@ -8,7 +8,7 @@ Data:
 ```{r}
 #aisles <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/aisles.csv.zip", "aisles.csv"), stringsAsFactors = FALSE)
 
-#departments <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/departments.csv.zip", "departments.csv"), stringsAsFactors = FALSE)
+departments <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/departments.csv.zip", "departments.csv"), stringsAsFactors = FALSE)
 
 orderp <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/order_products__prior.csv.zip", "order_products__prior.csv"), stringsAsFactors = FALSE)
 
@@ -273,8 +273,9 @@ write.csv(best_param, file = "best_parameters_FinalCV.csv")
 #fitting the best model
 
 ```{r}
+#vh(prior_test)
 subtrain <- prior_test %>% sample_frac(0.3)
-X <- xgb.DMatrix(as.matrix(subtrain %>% select(-reordered)), label = subtrain$reordered)
+X <- xgb.DMatrix(as.matrix(subtrain %>% select(-reordered, -user_id)), label = subtrain$reordered)
 
 #list from kaggle:
 # param <- list(
@@ -300,7 +301,7 @@ param <- list(objective = "binary:logistic",
                  min_child_weight = 32,
                  max_delta_step = 8)
                  
-cv_nround <- 200
+cv_nround <- 100
 cv_nfold <- 5
 
 mdcv <- xgboost(data = X,
@@ -313,9 +314,9 @@ mdcv <- xgboost(data = X,
                   maximize = FALSE
                   )
 
-Y <- xgb.DMatrix(as.matrix(test))
+Y <- xgb.DMatrix(as.matrix(test %>% select(-user_id)))
 test$reordered <- predict(mdcv, Y)
-save(test,file="test_with_preds_xgb1307_blödsinn.rda")
+#save(test,file="test_with_preds_xgb1307_blödsinn.rda")
 ```
 
 
@@ -343,6 +344,6 @@ submission <- test %>%
   group_by(order_id) %>% 
   summarise(products = paste(product_id, collapse = " "))
 
-write.csv(submission, file = "sub_xgb_notscaled_blödsinn_2.csv", row.names = F)
+write.csv(submission, file = "sub_xgb_notscaled_blödsinn_3_alldata.csv", row.names = F)
 ```
 
