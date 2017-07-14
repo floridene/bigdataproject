@@ -20,12 +20,12 @@ colnames(allitems) <- "items"
 
 rm(boing_test)
 gc()
-rules <- apriori(trans,parameter=list(supp=0.00001, conf=0.5,target="rules",maxtime=30)) #create apriori rules, confidence 50% as threshold
+rules <- apriori(trans,parameter=list(supp=0.00001, conf=0.6,target="rules",maxtime=30,maxlen=2)) #create apriori rules, confidence 50% as threshold
 ```
 
 ```{r}
 
-basket <-  #a test basket
+basket <- unlist(final_orders[1,3])
 rules.sub <- subset(rules, subset = lhs %in% basket)
 rules.sub <- subset(rules, subset = !lhs %in% as.character(allitems[!allitems$items %in% basket,1])) #all apriori rules which are based only on the basket
 
