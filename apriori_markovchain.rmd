@@ -20,15 +20,50 @@ colnames(allitems) <- "items"
 
 rm(boing_test)
 gc()
-rules <- apriori(trans,parameter=list(supp=0.00001, conf=0.6,target="rules",maxtime=30,maxlen=2)) #create apriori rules, confidence 50% as threshold
+
+rules <- apriori(trans,parameter=list(supp=0.00001, conf=0.5,target="rules",maxtime=30,maxlen=2))
+
+#create apriori rules, confidence 50% as threshold
 ```
+```{r}
+library(colorspace)
+plot(rules,control = list(col=sequential_hcl(100)))
+
+
+```
+
+```{r}
+head_rules <- head(rules, 15)
+```
+
+```{r}
+
+plot(head_rules, method="graph", control=list(layout=igraph::in_circle()))
+```
+
+```{r}
+plot(head_rules, method="graph")
+```
+
+```{r}
+plot(rules, method="grouped",
+  control = list(col = grey.colors(10),
+    gp_labels= gpar(col = "darkred", cex=1, fontface="bold")))
+
+
+```
+```{r}
+
+plot(rules, method="grouped")
+```
+
 
 ```{r}
 
 basket <- unlist(final_orders[1,3])
 rules.sub <- subset(rules, subset = lhs %in% basket)
 rules.sub <- subset(rules, subset = !lhs %in% as.character(allitems[!allitems$items %in% basket,1])) #all apriori rules which are based only on the basket
-
+  
 options (digits=2)
 inspect (rules.sub[1:10])
 
