@@ -57,6 +57,12 @@ plot(rules, method="grouped",
 plot(rules, method="grouped")
 ```
 
+```{r}
+subrules2 <- head(sort(rules, by="lift"), 10)
+subrules2
+plot(subrules2, method="graph",control=list(type="items",main="Apriori_Graph"))
+
+```
 
 ```{r}
 
