@@ -5,9 +5,6 @@ date: "14 7 2017"
 output: html_document
 ---
 
-##Dont fit model on train people, just on test users - Approach
-
-
 Libraries:
 ```{r, echo = F}
 library(data.table)
@@ -45,28 +42,32 @@ products <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/products.csv.z
 
 # Reshape data:
 ```{r}
-#merge user_id to op_train and op_prior as this column dont exist there
+aisles$aisle <- as.factor(aisles$aisle)
+departments$department <- as.factor(departments$department)
+orders$eval_set <- as.factor(orders$eval_set)
+products$product_name <- as.factor(products$product_name)
+
+# products <- products %>% 
+#   inner_join(aisles) %>% inner_join(departments) %>% 
+#   select(-aisle_id, -department_id)
+# rm(aisles, departments)
+
+#merge user_id to op_train
 op_train$user_id <- orders$user_id[match(op_train$order_id, orders$order_id)]
-op_prior$user_id <- orders$user_id[match(op_prior$order_id, orders$order_id)]
 
 #contains just prior order information -> test and train orders are not included!!
-orders_products <- orders %>% inner_join(op_prior, by = "order_id") #orders werden an op prior geklatscht
+orders_products <- orders %>% inner_join(op_prior, by = "order_id")
+#vh(orders_products)
+sum(is.na(orders_products$product_id))
 
-#orders_products2 <- orders %>% filter (eval_set=="prior") %>% inner_join(op_prior, by = "order_id")
-#dim(orders_products)
-#dim(orders_products2) # same row number. Evidence to have just prior data in it. 
 #orders_products %>% filter(order_id == 1187899)
 #orders_products %>% filter(eval_set == "train") # 0
 ```
 
 # Product Features:
-* create prd just out of information prior_test users instead overall...
-* add product_time > 3 / product_time = 1 -> products which are bought really often
-* scale product orders
-* could add information about ailes and departments (but factors!)
 ```{r}
 #contains just the product and how often it was ordered, reordered and so on.
-prd <- orders_products %>% #just prior(test and train users) information
+prd <- orders_products %>% #just prior information
   arrange(user_id, order_number, product_id) %>%
   group_by(user_id, product_id) %>%
   mutate(product_time = row_number()) %>%
@@ -85,20 +86,15 @@ prd$prod_reorder_probability <- prd$prod_second_orders / prd$prod_first_orders
 prd$prod_reorder_times <- 1 + prd$prod_reorders / prd$prod_first_orders
 prd$prod_reorder_ratio <- prd$prod_reorders / prd$prod_orders
 
-#join information about aisles and deparments
 prd <- prd %>%
   inner_join(products, by = "product_id") 
 
 prd <- prd %>% select(-prod_reorders, -prod_first_orders, -prod_second_orders, -product_name)
-
-head(prd)
 ```
 
 # User Features:
-* at the moment, new features base on prior information from text and train peops
-* new feature: which day and hour is used for shopping?
 ```{r}
-#user features based on the prior(train & test user) behavior. Here we have to take orders, and not product_orders as the second table contains each order information more than one times (*products). So we would count wrong sums and avgs.
+#prior orders -> test and train peops
 users <- orders %>%
   filter(eval_set == "prior") %>%
   group_by(user_id) %>%
@@ -108,8 +104,7 @@ users <- orders %>%
     user_mean_days_since_prior = mean(days_since_prior_order, na.rm = T) #average time between orders
   )
 
-
-#user features based on orders_products as we count how many products are included in an order and so on
+#prior orders, product info
 us <- orders_products %>%
   group_by(user_id) %>%
   summarise(
@@ -117,39 +112,44 @@ us <- orders_products %>%
     user_reorder_ratio = sum(reordered == 1) / sum(order_number > 1),
     user_distinct_products = n_distinct(product_id)
   )
+#vh(us)
 
-#joining both new features and calculate the user_average_basket
+
 users <- users %>% inner_join(us)
 users$user_average_basket <- users$user_total_products / users$user_orders
 
-head(orders)
-```
-
-#weg
-```{r}
 #test and train information for getting info about time was gone between last order and now
 us <- orders %>%
-  filter(eval_set == "prior") %>%
+  filter(eval_set != "prior") %>%
   select(user_id, order_id, eval_set,
          time_since_last_order = days_since_prior_order)
-head(us)
-head(users)
 
-#this creats a dataset for train and test people
-#users <- users %>% inner_join(us)
+users <- users %>% inner_join(us)
+
+#vh(users)
 ```
 
-# Create dataset:
-* create more features here as they are the most important once
+
+Visualisations:
 ```{r}
+# plot(users$user_orders[1:20]~ users$user_id[1:20])
+# plot(orders_products$eval_set)
+```
+
+# Create training dataset:
+```{r}
+orders_products %>% filter(eval_set == "test" | eval_set == "train") # 0 -> just prior
+
 #trained on prior information
 data <- orders_products %>%
   group_by(user_id, product_id) %>% 
   summarise(
-    up_orders = n(), #how often a user bought this product
-    up_first_order = min(order_number), #first order number where it appears
-    up_last_order = max(order_number), #last order where it appeared
-    up_average_cart_position = mean(add_to_cart_order)) #mean cart position
+    up_orders = n(),
+    up_first_order = min(order_number),
+    up_last_order = max(order_number),
+    up_average_cart_position = mean(add_to_cart_order))
+
+#rm(orders_products, orders)
 
 #join new features about user and products
 data <- data %>% 
@@ -159,87 +159,35 @@ data <- data %>%
 data$up_order_rate <- data$up_orders / data$user_orders
 data$up_orders_since_last_order <- data$user_orders - data$up_last_order
 data$up_order_rate_since_first_order <- data$up_orders / (data$user_orders - data$up_first_order + 1)
-```
-
-* Try with data_train2 (smaller dataset)
-
-Train dataset:
--> just test users and their prior behavior
-* mal mit und mal ohne product id trainieren
-```{r}
-#These are the test users and orders (which are contained by the dataset orders)
-testorders <- orders %>% filter(eval_set=="test") %>% select(user_id,order_id)
-testusers <- testorders[,1] #75000 users
-```
-
-## Ab hier 
-```{r}
-#head(data)
-#head(op_prior)
-#head(orders)
-#head(data_train)
 
 #join column reordered (lable variable)
+data <- data %>% 
+  left_join(op_train %>% select(user_id, product_id, reordered), 
+            by = c("user_id", "product_id"))
 
-orders_testusers <- orders %>%
-  filter(eval_set == "prior" & user_id %in% testusers) #just test users
-head(orders_testusers)
+#vh(data)
 
-data_train <- op_prior %>%
-  select (order_id, product_id, reordered) %>% 
-  inner_join(orders_testusers, by = "order_id") %>%
-  select (-eval_set)
-head(data_train)
-
-head(data)# wird and data train geklatscht
-head(data_train)
-
-data_train <- data_train %>%
-  left_join (data, by = c("user_id", "product_id"))
-head(data_train)
-
-data_train$user_id <- NULL
-data_train$order_id <- NULL
-data_train$product_id <- NULL
-data_train$eval_set <- NULL
-
-head(data_train)
+sum(is.na(data$reordered)) # not reordered
+data %>% filter (reordered < 1) # contains just 1 for reordered
 ```
-
-Test data set: without reordered column
-```{r}
-head(data)
-head(orders_test)
-
-orders_test <- orders %>% filter(eval_set == "test")
-
-data_test <- orders_test %>%
-  left_join (data, by = "user_id")
-
-head(data_test)
-
-data_test$eval_set <- NULL
-data_test$user_id <- NULL
-#keep product_id and order_id 
-```
-
 
 Split data into train and test dataset:
 ```{r}
-# train <- as.data.frame(data[data$eval_set == "train",])
-# #remove some columns
-# train$eval_set <- NULL
-# train$user_id <- NULL
-# train$product_id <- NULL #why?
-# train$order_id <- NULL
-# 
-# 
-# test <- as.data.frame(data[data$eval_set == "test",])
-# test$eval_set <- NULL
-# test$user_id <- NULL
-# test$reordered <- NULL
-# save(test, file = "test_xboost_vera.rda")
-# #hint: test has also some other features as order_id and product_id, on which nothing is predicted. But we can still assign the predictions to the user and order. 
+train <- as.data.frame(data[data$eval_set == "train",])
+#remove some columns
+train$eval_set <- NULL
+train$user_id <- NULL
+#train$product_id <- NULL
+train$order_id <- NULL
+train$reordered[is.na(train$reordered)] <- 0 #reordered Nas == 0
+save(train, file = "train_xboost_vera.rda")
+
+test <- as.data.frame(data[data$eval_set == "test",])
+test$eval_set <- NULL
+test$user_id <- NULL
+test$reordered <- NULL
+save(test, file = "test_xboost_vera.rda")
+#hint: test has also some other features as order_id and product_id, on which nothing is predicted. But we can still assign the predictions to the user and order. 
 ```
 
 # CV to find the best params:
@@ -279,35 +227,34 @@ params <- list(
 
 
 ```{r}
-#save(data_train, file = "1507data_train.rda")
-#head(data_train)
-subtrain <- data_train #%>% sample_frac(0.1) #train just on a fraction due to computation probs
+subtrain <- train #%>% sample_frac(0.1) #train just on a fraction due to computation probs
 X <- xgb.DMatrix(as.matrix(subtrain %>% select(-reordered)), label = subtrain$reordered) #create xgb matrix
 model <- xgboost(data = X, 
                  params = params, 
-                 nrounds = 100,
-                 nthread = 16
+                 nrounds = 300,
+                 nthread = 25
                  )
 
-importance <- xgb.importance(colnames(X), model = model)
-xgb.ggplot.importance(importance)
+#importance <- xgb.importance(colnames(X), model = model)
+#xgb.ggplot.importance(importance)
 ```
 
 * 10% subset, rounds = 80, min logloss = 0.242989 -> Leaderboard: 0.3792617
 * all data (train), rounds = 80, nthread = 16, min logloss = 0.244848
 * all data (train), rounds = 200, nthread = 16, min logloss = 0.243583 -> Leaderboard: 0.3815433
 * new cv params, all data, rounds = 200, min logloss = 0.245932 -> 37%
-* try 500 rounds, min logloss =  -> Leaderboard: 0.241410
-
+* try 600 rounds, min logloss = 0.241410 -> Leaderboard: 0.3813866
+* new feature "aisles and departments", all data (train), rounds = 100, min logloss = 0.244480 -> LB: 0.3808102
+* model with product_id , all data (train), rounds = 300, min logloss = 0.242679 > Leaderboard:0.3819342
+* 1000 rounds (over night)
 
 # Predict on model: 
 ```{r}
-head(data_test)
-Y <- xgb.DMatrix(as.matrix(data_test %>% select(-order_id, -product_id)))#here dont select order and product id as we dont want to predict on them
-data_test$reordered <- predict(model, Y)
+Y <- xgb.DMatrix(as.matrix(test %>% select(-order_id)))#here dont select order and product id as we dont want to predict on them
+test$reordered <- predict(model, Y)
 
 #save(test, file= "save_predictions_xgboost_vera_numero2_for_max.rda")
-vh(data_test)
+#vh(test)
 ```
 
 Cutting point:
@@ -316,7 +263,7 @@ Cutting point:
 * create scoring function to find the best cutoff point
 ```{r}
 #approach 1:
-data_test$reordered <- (data_test$reordered > 0.21) * 1
+test$reordered <- (test$reordered > 0.21) * 1
 ```
 
 cutoff lookup:
@@ -327,41 +274,9 @@ cutoff lookup:
 # lookup <- lookup %>% group_by(user_id) %>% mutate(cutoff=max(round((user_reorder_ratio+(1-user_reorder_ratio)/2)*user_average_basket),1))
 ```
 
-```{r, really bad}
-# vh(test)
-# vh(submission)
-# #Submission approach 2:
-# 
-# 
-# submission <- test %>% 
-#   inner_join(lookup, by="order_id")
-#   
-# submission <- submission %>% 
-#   arrange(user_id,-reordered)%>% 
-#   group_by(user_id) %>% 
-#   mutate(index=row_number()) %>% 
-#   filter(index<=cutoff) %>% 
-#   ungroup()
-# 
-# submission <- submission %>% 
-#   select(order_id,product_id) %>%
-#   group_by(order_id) %>% 
-#   summarise(products = paste(product_id, collapse = " "))
-# 
-# 
-# #some missing orders (75000 - 71044) # warum??
-# missing <- data.frame(
-#   order_id = unique(test$order_id[!test$order_id %in% submission$order_id]),
-#   products = "None"
-# )
-# submission <- submission %>% bind_rows(missing) %>% arrange(order_id)
-# write.csv(submission, file = "xgboost_numero1_submission_3_basketcut.csv", row.names = F)
-
-```
-
 # Submission:
 ```{r}
-submission <- data_test %>%
+submission <- test %>%
   filter(reordered == 1) %>% #select just products which are predicted as reordered
   group_by(order_id) %>%
   summarise(
@@ -370,12 +285,12 @@ submission <- data_test %>%
 
 #some missing orders (75000 - 71044) # warum??
 missing <- data.frame(
-  order_id = unique(data_test$order_id[!data_test$order_id %in% submission$order_id]),
+  order_id = unique(test$order_id[!test$order_id %in% submission$order_id]),
   products = "None"
 )
 
 submission <- submission %>% bind_rows(missing) %>% arrange(order_id)
-write.csv(submission, file = "xgboost_numero1_submission_6.csv", row.names = F)
+write.csv(submission, file = "xgboost_numero1_submission_8_withProductID.csv", row.names = F)
 ```
 
 # Improvement Ideas:
