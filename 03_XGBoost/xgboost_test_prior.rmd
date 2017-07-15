@@ -1,0 +1,293 @@
+---
+title: "xgboost neu"
+output: html_notebook
+---
+
+
+```{r}
+aisles <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/aisles.csv.zip", "aisles.csv"), stringsAsFactors = FALSE)
+
+departments <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/departments.csv.zip", "departments.csv"), stringsAsFactors = FALSE)
+
+orderp <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/order_products__prior.csv.zip", "order_products__prior.csv"), stringsAsFactors = FALSE)
+
+ordert <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/order_products__train.csv.zip", "order_products__train.csv"), stringsAsFactors = FALSE)
+
+orders <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/orders.csv.zip", "orders.csv"), stringsAsFactors = FALSE)
+testorders <- orders %>% filter(eval_set=="test") %>% select(user_id,order_id)
+
+products <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/products.csv.zip", "products.csv"), stringsAsFactors = FALSE)
+
+#sample_submission <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/sample_submission.csv.zip", "sample_submission.csv"), stringsAsFactors = FALSE)
+
+```
+
+```{r}
+library(data.table)
+library(dplyr)
+library(tidyr)
+
+```
+
+# Reshape data ------------------------------------------------------------
+```{r}
+aisles$aisle <- as.factor(aisles$aisle)
+departments$department <- as.factor(departments$department)
+orders$eval_set <- as.factor(orders$eval_set)
+products$product_name <- as.factor(products$product_name)
+
+products <- products %>% 
+  inner_join(aisles) %>% inner_join(departments) %>% 
+  select(-aisle_id, -department_id)
+rm(aisles, departments)
+
+ordert$user_id <- orders$user_id[match(ordert$order_id, orders$order_id)]
+
+orders_products <- orders %>% inner_join(orderp, by = "order_id")
+
+rm(orderp)
+gc()
+
+```
+
+identifiing test users
+```{r}
+load("/home/Vera_Weidmann/Supermarket/00_Data/boing_test.rda")
+testusers <- unique(boing_test$user_id)
+rm(boing_test)
+gc()
+```
+
+subset original dataset
+```{r}
+prior_test <- orders_products %>% filter(eval_set=="prior" & user_id %in% testusers)
+```
+
+```{r}
+prd <- prior_test %>%
+  arrange(user_id, order_number, product_id) %>%
+  group_by(user_id, product_id) %>%
+  mutate(product_time = row_number()) %>%
+  ungroup() %>%
+  group_by(product_id) %>%
+  summarise(
+    prod_orders = n(),
+    prod_reorders = sum(reordered),
+    prod_first_orders = sum(product_time == 1),
+    prod_second_orders = sum(product_time == 2)
+  )
+
+prd$prod_reorder_probability <- prd$prod_second_orders / prd$prod_first_orders
+prd$prod_reorder_times <- 1 + prd$prod_reorders / prd$prod_first_orders
+prd$prod_reorder_ratio <- prd$prod_reorders / prd$prod_orders
+
+prd[,c(2:5,7)] <- scale(prd[,c(2:5,7)])
+#prd <- prd %>% select(-prod_reorders, -prod_first_orders, -prod_second_orders)
+
+#rm(products)
+#gc()
+```
+
+```{r}
+users <- orders %>%
+  filter(eval_set == "prior" & user_id %in% testusers) %>%
+  group_by(user_id) %>%
+  summarise(
+    user_orders = max(order_number),
+    user_period = sum(days_since_prior_order, na.rm = T),
+    user_mean_days_since_prior = mean(days_since_prior_order, na.rm = T)
+  )
+
+us <- orders_products %>%
+  group_by(user_id) %>%
+  summarise(
+    user_total_products = n(),
+    user_reorder_ratio = sum(reordered == 1) / sum(order_number > 1),
+    user_distinct_products = n_distinct(product_id)
+  )
+
+users <- users %>% inner_join(us)
+users$user_average_basket <- users$user_total_products / users$user_orders
+
+user_average_basket <- users[,c(1,8)]
+
+users[,c(2:5,7,8)] <- scale(users[,c(2:5,7,8)])
+#us <- orders %>%
+  #filter(eval_set != "prior") %>%
+  #select(user_id, order_id, eval_set,
+  #       time_since_last_order = days_since_prior_order)
+
+
+rm(us)
+gc()
+```
+
+```{r}
+prior_test <- prior_test %>% 
+  inner_join(prd, by = "product_id") %>%
+  inner_join(users, by = "user_id") %>% select(-add_to_cart_order)
+```
+
+```{r}
+test <- prior_test %>% select(-order_id,-reordered) %>% group_by(user_id,product_id) %>%  filter(order_number==max(order_number)) %>% arrange(product_id,user_id)
+test <- test[,-c(2:6)]
+test <- test %>% inner_join(orders[,-1]%>% filter(eval_set=="test"), by="user_id")
+test <- test[,-17]
+```
+
+```{r}
+prior_test <- prior_test %>% filter(!is.na(days_since_prior_order)) %>% select(-eval_set,-order_id)
+```
+
+```{r}
+save(prior_test, file="prior_test.rda")
+save(test,file="test.rda")
+load("/home/Max_Philipp/bigdataproject/test.rda")
+write.csv(prior_test, file="prior_test.csv")
+write.csv(test,file="test_prior_test.csv")
+```
+
+```{r}
+rm(orders)
+rm(orders_products)
+rm(ordert)
+rm(prd)
+rm(users)
+rm(products)
+```
+
+
+```{r}
+load("prior_test.rda")
+library(xgboost)
+subtrain <- prior_test %>% sample_frac(0.2)
+X <- xgb.DMatrix(as.matrix(subtrain %>% select(-reordered)), label = subtrain$reordered)
+```
+
+test for best params
+```{r}
+best_param <- list()
+best_seednumber <- 1234
+best_logloss <- Inf
+best_logloss_index <- 0
+best_CVround <- 0
+
+
+
+for (iter in 1:20) {
+   param <- list(objective = "binary:logistic",
+                 eval_metric = "logloss",
+                 max_depth = sample(6:12, 1),
+                 eta = runif(1, .01, .3),
+                 gamma = runif(1, 0.0, 0.2),
+                 subsample = runif(1, .6, .9),
+                 colsample_bytree = runif(1, .5, .8),
+                 min_child_weight = sample(1:40, 1),
+                 max_delta_step = sample(1:10, 1)
+                 )
+   
+   ## cv_nround <- c(250, 500, 1000) # We first choose three different numbers of rounds. However, putting early_stopping in place made this step obsolete. Therefere, we were able to get rid of the nested for loop.
+   cv_nround <- 100
+   cv_nfold <- 5
+   seed_number = sample.int(10000, 1)[[1]]
+   set.seed(seed_number)
+   message("Iteration Round: ", as.character(iter), appendLF = FALSE) ## Check at which iteration we are.
+   
+   ## for (validator in cv_nround) {
+     mdcv <- xgb.cv(data = X,
+                  params = param,
+                  nfold = cv_nfold,
+                  nrounds = cv_nround,
+                  nthread = 32,
+                  verbose = TRUE,
+                  early_stopping_rounds = 20,
+                  maximize = FALSE
+                  )
+
+   min_logloss <- min(mdcv$evaluation_log$test_logloss_mean)
+   min_logloss_index <- which.min(mdcv$evaluation_log$test_logloss_mean)
+
+   if (min_logloss < best_logloss) {
+       best_logloss = min_logloss
+       best_logloss_index = min_logloss_index
+       best_seednumber = seed_number
+       best_param = param
+       ## best_CVround = mdcv$niter
+       
+      }
+  ## }
+}
+
+## Save the best parameters
+write.csv(best_param, file = "best_parameters_FinalCV.csv")
+
+```
+
+fitting the best model
+
+```{r}
+subtrain <- prior_test %>% sample_frac(0.1)
+X <- xgb.DMatrix(as.matrix(subtrain %>% select(-reordered)), label = subtrain$reordered)
+param <- list(objective = "binary:logistic",
+                 eval_metric = "logloss",
+                 max_depth = 9,
+                 eta = 0.08910454,
+                 gamma = 0.1459201,
+                 subsample = 0.7306826,
+                 colsample_bytree = 0.6887265,
+                 min_child_weight = 32,
+                 max_delta_step = 8)
+                 
+   cv_nround <- 200
+   cv_nfold <- 5
+
+     mdcv <- xgb.cv(data = X,
+                  params = param,
+                  nfold = cv_nfold,
+                  nrounds = cv_nround,
+                  nthread = 32,
+                  verbose = TRUE,
+                  early_stopping_rounds = 20,
+                  maximize = FALSE
+                  )
+
+Y <- xgb.DMatrix(as.matrix(test))
+test$reordered <- predict(mdcv, Y)
+save(test,file="test_with_preds_xgb1207.rda")
+```
+
+ab hier: preds1207 from h2o distributed random forest 50 trees 5fold
+
+```{r}
+user_average_basket$user_average_basket <- round(as.numeric(user_average_basket$user_average_basket))
+```
+
+```{r}
+<<<<<<< HEAD
+lookup <- test %>% group_by(user_id) %>% select(user_id,user_reorder_ratio) %>% mutate(index=row_number()) %>% filter(index==1) %>% left_join(user_average_basket, by="user_id") %>% select(-index) %>% mutate(cutoff=round(user_average_basket*user_reorder_ratio))
+save(lookup,file="cutofflookup.rda")
+```
+
+```{r}
+test$reordered <- preds1207$p1 #enter predictions here
+=======
+test$reordered <- preds_xgb$reordered #enter predictions here
+>>>>>>> 57bd9331e6dfc993970f7d2e68e5f8d7303dab7c
+
+
+submission <- test %>% 
+  select(-user_average_basket) %>% 
+  inner_join(user_average_basket, by="user_id")%>% 
+  arrange(user_id,-reordered)%>% 
+  group_by(user_id) %>% 
+  mutate(index=row_number()) %>% 
+  filter(index<=user_average_basket) %>% 
+  ungroup() %>% 
+  inner_join(testorders,by="user_id") %>% 
+  select(order_id,product_id) %>%
+  group_by(order_id) %>% 
+  summarise(products = paste(product_id, collapse = " "))
+
+write.csv(submission, file = "sub_xgb1000rounds_1207.csv", row.names = F)
+```
+
