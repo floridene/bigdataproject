@@ -41,6 +41,19 @@ cross_tab
 
 
 
+#total users per aisle
+```{r}
+
+counted3 <- aggregate(cbind(count = total$user_id) ~ aisle, 
+          data = total, 
+          FUN = function(x){NROW(x)})
+
+counted3
+
+
+```
+
+
 ```{r }
 
 library(data.table)
@@ -114,17 +127,4 @@ counted1 <- aggregate(cbind(count = total$product_id) ~ product_name,
 
 ```
 
-
-
-
-```{r}
-
-counted3 <- aggregate(cbind(count = total$user_id) ~ aisle, 
-          data = total, 
-          FUN = function(x){NROW(x)})
-
-counted3
-
-
-```
 
