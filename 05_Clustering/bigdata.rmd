@@ -5,6 +5,7 @@ date: "July 15, 2017"
 output: html_document
 ---
 
+ I just took a small sample for customer segmentation,because it takes so long to run for all but it is basically grouping custumers per aisle.
 
 
 #Combine the Data
@@ -27,6 +28,17 @@ total <- order_products %>%
   left_join(departments,by="department_id") %>% 
   left_join(orders, by="order_id")
 ```
+
+#Segmenting customers per aisle
+
+```{r}
+library(descr)
+x <- head(total,15)
+x
+cross_tab <- descr::crosstab( x$user_id, x$aisle )
+cross_tab
+```
+
 
 
 ```{r }
@@ -100,15 +112,6 @@ counted1 <- aggregate(cbind(count = total$product_id) ~ product_name,
           data = total, 
           FUN = function(x){NROW(x)})
 
-```
-#Segmenting customers per aisle
-
-```{r}
-library(descr)
-x <- head(total,15)
-x
-cross_tab <- descr::crosstab( x$user_id, x$aisle )
-cross_tab
 ```
 
 
