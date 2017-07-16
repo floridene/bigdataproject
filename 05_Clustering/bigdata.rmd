@@ -1,0 +1,127 @@
+---
+title: "INSTACART MARKET BASKET ANALYSIS"
+author: "Ceyda Ugur"
+date: "July 15, 2017"
+output: html_document
+---
+
+
+
+#Combine the Data
+```{r}
+library(dplyr)
+library(readr)
+order_products_prior <- read_csv("C:/Users/cugur/Desktop/R/order_products__prior.csv")
+order_products_train <- read_csv("C:/Users/cugur/Desktop/R/order_products__train.csv")
+products <- read_csv("C:/Users/cugur/Desktop/R/products.csv")
+departments <- read_csv("C:/Users/cugur/Desktop/R/departments.csv")
+aisles <- read_csv("C:/Users/cugur/Desktop/R/aisles.csv")
+orders <- read_csv("C:/Users/cugur/Desktop/R/orders.csv")
+
+
+order_products <- rbind(order_products_prior, order_products_train)
+
+total <- order_products %>%
+  left_join(products, by= "product_id") %>%
+  left_join(aisles,by="aisle_id") %>%
+  left_join(departments,by="department_id") %>% 
+  left_join(orders, by="order_id")
+```
+
+
+```{r }
+
+library(data.table)
+library(plyr)
+total
+                  
+```
+#How many unique products are there?
+```{r}
+length(unique(total$product_id))
+
+```
+#How many products are there?
+
+```{r}
+length(total$product_id)
+```
+#How many distinct users are there?
+```{r}
+length(unique(total$user_id))
+
+```
+#How many unique orders are there?
+
+```{r}
+length(unique(total$order_id))
+
+```
+#How many products are there in each aisle?
+```{r}
+
+aisle <- aggregate(cbind(count = total$product_id) ~ aisle, 
+          data = total, 
+          FUN = function(x){NROW(x)})
+aisle
+
+
+```
+
+How many user_id only have 1 order?
+
+```{r }
+library(data.table)
+library(plyr)
+DT <-  data.table(orders)
+users <- DT[ , .SD[which.min(order_number)], by = DT$user_id]
+
+nrow(users) #206209 users have the minimum amount of orders which is one
+
+```
+
+What is the maximum amount of order?
+```{r}
+
+library(data.table)
+library(plyr)
+(which.max(DT$order_number))
+
+#Max order amount is 3265
+
+```
+
+#How many products are there in product_name?
+
+```{r}
+
+
+counted1 <- aggregate(cbind(count = total$product_id) ~ product_name, 
+          data = total, 
+          FUN = function(x){NROW(x)})
+
+```
+#Segmenting customers per aisle
+
+```{r}
+library(descr)
+x <- head(total,15)
+x
+cross_tab <- descr::crosstab( x$user_id, x$aisle )
+cross_tab
+```
+
+
+
+
+```{r}
+
+counted3 <- aggregate(cbind(count = total$user_id) ~ aisle, 
+          data = total, 
+          FUN = function(x){NROW(x)})
+
+counted3
+
+
+```
+
