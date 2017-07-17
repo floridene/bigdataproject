@@ -1,0 +1,58 @@
+```{r}
+library(dplyr)
+library(reshape2)
+
+aisles <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/aisles.csv.zip", "aisles.csv"), stringsAsFactors = FALSE)
+
+departments <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/departments.csv.zip", "departments.csv"), stringsAsFactors = FALSE)
+
+orderp <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/order_products__prior.csv.zip", "order_products__prior.csv"), stringsAsFactors = FALSE)
+
+ordert <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/order_products__train.csv.zip", "order_products__train.csv"), stringsAsFactors = FALSE)
+
+orders <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/orders.csv.zip", "orders.csv"), stringsAsFactors = FALSE)
+testorders <- orders %>% filter(eval_set=="test") %>% select(user_id,order_id)
+
+products <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/products.csv.zip", "products.csv"), stringsAsFactors = FALSE)
+
+# Reshape data ------------------------------------------------------------
+aisles$aisle <- as.factor(aisles$aisle)
+departments$department <- as.factor(departments$department)
+orders$eval_set <- as.factor(orders$eval_set)
+products$product_name <- as.factor(products$product_name)
+
+products <- products %>% 
+  inner_join(aisles) %>% inner_join(departments) %>% 
+  select(-aisle_id, -department_id)
+
+load("/home/Vera_Weidmann/Supermarket/00_Data/boing_test.rda")
+testusers <- unique(boing_test$user_id)
+rm(boing_test)
+gc()
+
+users <- orderp %>% 
+  inner_join(orders, by="order_id") %>% 
+  inner_join(products, by="product_id") %>% 
+  select(user_id, product_id,aisle) %>% 
+  group_by(user_id,aisle) %>% 
+  summarise(n=n()) %>% 
+  mutate(perc=n/sum(n)) %>%  
+  dcast(user_id ~ aisle, value.var="perc") %>% 
+  filter(user_id %in% testusers)
+users[is.na(users)] <-0
+
+save(users, file="user_aisle_freq.rda")
+rm(orderp)
+rm(orders)
+rm(ordert)
+rm(products)
+rm(aisles)
+rm(departments)
+gc()
+require(vegan)
+distance <- dist(users)
+save(distance,file="user_aisle_distance.rda")
+
+```
+
+
