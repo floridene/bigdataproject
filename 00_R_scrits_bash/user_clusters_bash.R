@@ -1,0 +1,11 @@
+load("/home/Max_Philipp/bigdata/user_aisle_distance.rda")
+load("/home/Max_Philipp/bigdata/user_aisle_freq.rda")
+km50 <- kmeans(distance,50)
+library(dplyr)
+users$cluster <- km50$cluster
+users <- users %>% select(user_id, cluster)
+save(users, file="/home/Max_Philipp/bigdata/user_cluster_lookup.rda")
+rm(distance)
+rm(users)
+rm(km50)
+gc()
