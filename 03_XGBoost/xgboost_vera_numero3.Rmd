@@ -16,8 +16,7 @@ library(ggplot2)
 vh <- function(x){View(head(x,25))}
 ```
 
-
-# Prep: 
+### Prep: 
 
 Loading Data:
 * Aisles and Department data just contain the name belonging to the number; not needed here as xgboost needs hot encoded or label encoded(numeric) features. 
@@ -40,33 +39,35 @@ orders <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/orders.csv.zip",
 products <- read.csv(unz("/home/Vera_Weidmann/Supermarket/00_Data/products.csv.zip", "products.csv"), stringsAsFactors = FALSE)
 ```
 
-# Reshape data:
+Reshape data:
 ```{r}
-aisles$aisle <- as.factor(aisles$aisle)
-departments$department <- as.factor(departments$department)
-orders$eval_set <- as.factor(orders$eval_set)
-products$product_name <- as.factor(products$product_name)
-
-# products <- products %>% 
-#   inner_join(aisles) %>% inner_join(departments) %>% 
-#   select(-aisle_id, -department_id)
-# rm(aisles, departments)
-
-#merge user_id to op_train
+# merge user_id to op_train and op_prior
 op_train$user_id <- orders$user_id[match(op_train$order_id, orders$order_id)]
+op_prior$user_id <- orders$user_id[match(op_prior$order_id, orders$order_id)]
 
-#contains just prior order information -> test and train orders are not included!!
-orders_products <- orders %>% inner_join(op_prior, by = "order_id")
-#vh(orders_products)
-sum(is.na(orders_products$product_id))
+# merge the information about orders to prior order behavior. This data contains just information about prior orders form training and test users. 
+orders_products <- orders %>% inner_join(op_prior, by = c("order_id", "user_id"))
+head(orders_products)
 
-#orders_products %>% filter(order_id == 1187899)
-#orders_products %>% filter(eval_set == "train") # 0
+#These are the test users and orders (which are contained by the dataset orders)
+testorders <- orders %>% filter(eval_set=="test") %>% select(user_id,order_id)
+testusers <- testorders[,1] #75000 users
 ```
 
-# Product Features:
+### Product Features:
+
+Here we create new features which decribes the product, based on the prior order behavior:
+(* product_time: How often a product occured based on the user order_history)
+* prod_orders: How often a product was bought over all users and baskets
+* prod_reorderes: How often a product was reordered over all users and baskets
+* prod_first_orders: reflects how often a product was added the first time to a basket
+* prod_second_orders: reflects how often a product was added the second time to a basket
+* prod_reorder_probability: How often a product was added a second time
+* prod_reorder_times: probability of how often a product was reordered from all products which were bought to first time.
+* prod_reorder_ratio: probaility of how often a product was reordered from all product purchases. 
+
 ```{r}
-#contains just the product and how often it was ordered, reordered and so on.
+
 prd <- orders_products %>% #just prior information
   arrange(user_id, order_number, product_id) %>%
   group_by(user_id, product_id) %>%
@@ -77,24 +78,37 @@ prd <- orders_products %>% #just prior information
     prod_orders = n(), #count products
     prod_reorders = sum(reordered), #count products reordered
     prod_first_orders = sum(product_time == 1), #product bought first time
-    prod_second_orders = sum(product_time == 2) #product bought second time
+    prod_second_orders = sum(product_time == 2) #product bought second time or more often
   )
-
-#vh(prd)
 
 prd$prod_reorder_probability <- prd$prod_second_orders / prd$prod_first_orders
 prd$prod_reorder_times <- 1 + prd$prod_reorders / prd$prod_first_orders
 prd$prod_reorder_ratio <- prd$prod_reorders / prd$prod_orders
 
+#joining aisles and depertment ids
 prd <- prd %>%
-  inner_join(products, by = "product_id") 
+  inner_join(products, by = "product_id")
 
-prd <- prd %>% select(-prod_reorders, -prod_first_orders, -prod_second_orders, -product_name)
+# chose features you want to keep
+#prd <- prd %>% select(-prod_reorders, -prod_first_orders, -prod_second_orders)
+prd <- prd %>% select(-product_name)
+
+vh(prd)
 ```
 
-# User Features:
+
+### User Features:
+
+These features also based on the prior user behavior. These features are created for training and test users.
+* user_orders: how many orderes a user has
+* user_period: how many days lie between the first order and the last one. 
+* user_mean_days_since_prior: average time between orders.
+* user_total_products: how many products had the user already bought
+* user_reorder_ratio: how many products are reordered 
+* user_distinct_products: how many unique products does the user buy
+* user_average_basket: average number of products within a basket
 ```{r}
-#prior orders -> test and train peops
+
 users <- orders %>%
   filter(eval_set == "prior") %>%
   group_by(user_id) %>%
@@ -104,50 +118,49 @@ users <- orders %>%
     user_mean_days_since_prior = mean(days_since_prior_order, na.rm = T) #average time between orders
   )
 
-#prior orders, product info
 us <- orders_products %>%
   group_by(user_id) %>%
   summarise(
     user_total_products = n(),
-    user_reorder_ratio = sum(reordered == 1) / sum(order_number > 1),
+    #user_reorder_ratio = sum(reordered == 1) / sum(order_number > 1),
+    user_reorder_ratio = sum(reordered == 1) / n(),
     user_distinct_products = n_distinct(product_id)
   )
-#vh(us)
-
 
 users <- users %>% inner_join(us)
 users$user_average_basket <- users$user_total_products / users$user_orders
 
-#test and train information for getting info about time was gone between last order and now
+#identifier for users which are test and train users. 
 us <- orders %>%
   filter(eval_set != "prior") %>%
   select(user_id, order_id, eval_set,
          time_since_last_order = days_since_prior_order)
 
-users <- users %>% inner_join(us)
+users <- users %>% inner_join(us) #kritisch!
+vh(users)
 
-#vh(users)
+#order_id and eval_set are the identifier for train and test users last order. 
 ```
 
-Features: User-Aisles and Department
 
--> Aisles frstures : how often a organic is reordered, hoow clean they are
+### Aisle and Department Features
 
+* How often a specific department is bought by a user
 
-Visualisations:
-```{r}
-# plot(users$user_orders[1:20]~ users$user_id[1:20])
-# plot(orders_products$eval_set)
-```
 
 # Create training dataset:
-* how often a product lately (~ last 4 orders/ days)
-* procentage of all products in user
-* n productuser / max number of orders: uporders / up_last order
-```{r}
-orders_products %>% filter(eval_set == "test" | eval_set == "train") # 0 -> just prior
 
-#trained on prior information
+User & product specific features:
+* up_orders: how often one specific user ordered a products
+* up_first_order: when did this product occured at first
+* up_last_order: when did the product occured at least
+* up_average_cart_position: the average of when the product is added to the cart
+* up_order_rate: % of how often a specific product was bought
+* up_orders_since_last_order: difference between number of orders and the order when the product occured the last time
+* up_order_rate_since_first_order: difference between number of orders and the order number when the product occured the first time. 
+
+```{r}
+
 data <- orders_products %>%
   group_by(user_id, product_id) %>% 
   summarise(
@@ -156,7 +169,7 @@ data <- orders_products %>%
     up_last_order = max(order_number),
     up_average_cart_position = mean(add_to_cart_order))
 
-#rm(orders_products, orders)
+head(data)
 
 #join new features about user and products
 data <- data %>% 
@@ -165,18 +178,28 @@ data <- data %>%
 
 data$up_order_rate <- data$up_orders / data$user_orders
 data$up_orders_since_last_order <- data$user_orders - data$up_last_order
-data$up_order_rate_since_first_order <- data$up_orders / (data$user_orders - data$up_first_order + 1)
+data$up_order_rate_since_first_order <- 
+  data$up_orders / (data$user_orders - data$up_first_order + 1)
 
 #join column reordered (lable variable)
 data <- data %>% 
   left_join(op_train %>% select(user_id, product_id, reordered), 
             by = c("user_id", "product_id"))
 
-#vh(data)
-
 sum(is.na(data$reordered)) # not reordered
 data %>% filter (reordered < 1) # contains just 1 for reordered
+
+vh(data)
+
 ```
+
+Here is the opportunity to scale some features:
+
+```{r}
+#data[,c(2:5,7,8,11)] <- scale(data[,c(2:5,7,8,11)])
+#head(data)
+```
+
 
 Split data into train and test dataset:
 ```{r}
@@ -187,98 +210,87 @@ train$user_id <- NULL
 #train$product_id <- NULL
 train$order_id <- NULL
 train$reordered[is.na(train$reordered)] <- 0 #reordered Nas == 0
-save(train, file = "train_xboost_vera.rda")
+save(train, file = "train_xboost_vera_nuemro3.rda")
 
 test <- as.data.frame(data[data$eval_set == "test",])
 test$eval_set <- NULL
 test$user_id <- NULL
 test$reordered <- NULL
-save(test, file = "test_xboost_vera.rda")
-#hint: test has also some other features as order_id and product_id, on which nothing is predicted. But we can still assign the predictions to the user and order. 
+save(test, file = "test_xboost_vera_numer03.rda")
 ```
 
 # CV to find the best params:
 can be fined in xgboost_vera_numero1_cv.R
 
 # Fit model
-```{r, old params}
+```{r}
+#new params:
+best_params <- read_csv("~/bigdataproject/03_XGBoost/2107xgboost_vera_best_parameters_FinalCV.csv")
+best_params
+
 params <- list(
-  "objective"           = "reg:logistic",
+  "objective"           = "binary:logistic",
   "eval_metric"         = "logloss",
-  "eta"                 = 0.1,
-  "max_depth"           = 6,
-  "min_child_weight"    = 10,
-  "gamma"               = 0.70,
-  "subsample"           = 0.76,
-  "colsample_bytree"    = 0.95,
-  "alpha"               = 2e-05,
+  "eta"                 = 0.1139337,
+  "gamma"               = 0.1440471,
+  "max_depth"           = 8,
+  "min_child_weight"    = 17,
+  "max_delta_step"      = 2, 
+  "subsample"           = 0.718962,
+  "colsample_bytree"    = 0.7965357,
+  "alpha"               = 5.206276e-05,
   "lambda"              = 10
 )
+
 ```
 
-* CV params are worse häää
-```{r, cv params}
+
+```{r, old params}
+#old params:
 # params <- list(
 #   "objective"           = "binary:logistic",
 #   "eval_metric"         = "logloss",
-#   "eta"                 = 0.1243062,
-#   "gamma"               = 0.009902287,
-#   "subsample"           = 0.8632304,
-#   "colsample_bytree"    = 0.6544246,
-#   "max_depth"           = 3,
-#   "min_child_weight"    = 30
-#   #"alpha"               = 2e-05, #old
-#   #"lambda"              = 10     #old
+#   "tree_method"         = "exact",
+#   "eta"                 = 0.1,
+#   "max_depth"           = 6,
+#   "min_child_weight"    = 10,
+#   "gamma"               = 0.70,
+#   "subsample"           = 0.76,
+#   "colsample_bytree"    = 0.95,
+#   "alpha"               = 2e-05,
+#   "lambda"              = 10
 # )
 ```
 
-
 ```{r}
+
 subtrain <- train #%>% sample_frac(0.1) #train just on a fraction due to computation probs
 X <- xgb.DMatrix(as.matrix(subtrain %>% select(-reordered)), label = subtrain$reordered) #create xgb matrix
 model <- xgboost(data = X, 
                  params = params, 
                  nrounds = 300,
-                 nthread = 25
+                 nthread = 16
                  )
 
-#importance <- xgb.importance(colnames(X), model = model)
-#xgb.ggplot.importance(importance)
+importance <- xgb.importance(colnames(X), model = model)
+xgb.ggplot.importance(importance)
+
+
+ggsave(xgb.ggplot.importance(importance), file = "feature_importance.png")
 ```
 
-* 10% subset, rounds = 80, min logloss = 0.242989 -> Leaderboard: 0.3792617
-* all data (train), rounds = 80, nthread = 16, min logloss = 0.244848
-* all data (train), rounds = 200, nthread = 16, min logloss = 0.243583 -> Leaderboard: 0.3815433
-* new cv params, all data, rounds = 200, min logloss = 0.245932 -> 37%
-* try 600 rounds, min logloss = 0.241410 -> Leaderboard: 0.3813866
-* new feature "aisles and departments", all data (train), rounds = 100, min logloss = 0.244480 -> LB: 0.3808102
-* model with product_id , all data (train), rounds = 300, min logloss = 0.242679 > Leaderboard:0.3819342
-* 1000 rounds (over night)
 
 # Predict on model: 
 ```{r}
-Y <- xgb.DMatrix(as.matrix(test %>% select(-order_id)))#here dont select order and product id as we dont want to predict on them
+Y <- xgb.DMatrix(as.matrix(test %>% select(-order_id)))
 test$reordered <- predict(model, Y)
 
-#save(test, file= "save_predictions_xgboost_vera_numero2_for_max.rda")
+save(test, file= "2207predictions_xgboost_vera_numero3_newparams.rda")
 #vh(test)
 ```
 
-Cutting point:
-* > 21 % -> Kaggle leaderboard score: 0.3792617, 0.3815433
-* cutoff point -> Leaderboard 0.15 (bad!!!)
-* create scoring function to find the best cutoff point
 ```{r}
-#approach 1:
 test$reordered <- (test$reordered > 0.21) * 1
-```
-
-cutoff lookup:
-```{r}
-# #approach 2:
-# load("/home/Max_Philipp/bigdataproject/cutofflookup.rda")
-# 
-# lookup <- lookup %>% group_by(user_id) %>% mutate(cutoff=max(round((user_reorder_ratio+(1-user_reorder_ratio)/2)*user_average_basket),1))
 ```
 
 # Submission:
@@ -290,19 +302,12 @@ submission <- test %>%
     products = paste(product_id, collapse = " ")
   )
 
-#some missing orders (75000 - 71044) # warum??
+#some missing orders (75000 - 71044)
 missing <- data.frame(
   order_id = unique(test$order_id[!test$order_id %in% submission$order_id]),
   products = "None"
 )
 
 submission <- submission %>% bind_rows(missing) %>% arrange(order_id)
-write.csv(submission, file = "xgboost_numero1_submission_8_withProductID.csv", row.names = F)
+write.csv(submission, file = "xgboost_numero3_submission_2_new_params.csv", row.names = F)
 ```
-
-# Improvement Ideas:
-
-* Dont train on the train users
-* Scale features
-* PCA ?
-* cutting point ändern -> scoring function and optimize on training data

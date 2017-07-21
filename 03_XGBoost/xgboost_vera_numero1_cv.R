@@ -1,5 +1,5 @@
-load("train_xboost_vera.rda")
-load("test_xboost_vera.rda")
+load("train_xboost_vera_nuemro3.rda")
+load("test_xboost_vera_numer03.rda")
 
 library(xgboost)
 library(data.table)
@@ -15,19 +15,20 @@ best_logloss <- Inf
 best_logloss_index <- 0
 best_CVround <- 0
 
-for (iter in 1:20) {
+for (iter in 1:50) {
   param <- list(objective = "binary:logistic",
                 eval_metric = "logloss",
-                max_depth = sample(6:12, 1),
                 eta = runif(1, .01, .3),
                 gamma = runif(1, 0.0, 0.2),
+                max_depth = sample(4:12, 1),
+                min_child_weight = sample(1:30, 1),
+                max_delta_step = sample(1:10, 1),
                 subsample = runif(1, .6, .9),
                 colsample_bytree = runif(1, .5, .8),
-                min_child_weight = sample(1:40, 1),
-                max_delta_step = sample(1:10, 1)
+                lambda = sample(1:15, 1),
+                alpha = runif(1, 0.0, 0.0002)
   )
   
-  ## cv_nround <- c(250, 500, 1000) # We first choose three different numbers of rounds. However, putting early_stopping in place made this step obsolete. Therefere, we were able to get rid of the nested for loop.
   cv_nround <- 100
   cv_nfold <- 5
   seed_number = sample.int(10000, 1)[[1]]
@@ -59,7 +60,6 @@ for (iter in 1:20) {
   ## }
 }
 
-
 #Save the best parameters
-write.csv(best_param, file = "xgboost_vera_best_parameters_FinalCV.csv")
+write.csv(best_param, file = "2107xgboost_vera_best_parameters_FinalCV.csv")
 
