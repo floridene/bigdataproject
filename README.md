@@ -62,6 +62,8 @@ There are 21 departments at total. These departments contain different amount of
 #### References
 
 Steffen Rendle, Christoph Freudenthaler, Lars Schmidt-Thieme: Factorizing Personalized Markov Chainsfor Next-Basket Recommendation
+
 Shengxian Wan, Yanyan Lan, Pengfei Wang, Jiafeng Guo, Jun Xu, Xueqi Cheng (2015): Next Basket Recommendation with Neural Networks
+
 Jakob Aungiers (2016): LSTM Neural Network for Time Series Prediction. URL: http://www.jakob-aungiers.com/articles/a/LSTM-Neural-Network-for-Time-Series-Prediction
 
