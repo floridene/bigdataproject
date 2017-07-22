@@ -107,6 +107,7 @@ These features also based on the prior user behavior. These features are created
 * user_reorder_ratio: how many products are reordered 
 * user_distinct_products: how many unique products does the user buy
 * user_average_basket: average number of products within a basket
+
 ```{r}
 
 users <- orders %>%
@@ -189,7 +190,7 @@ data <- data %>%
 sum(is.na(data$reordered)) # not reordered
 data %>% filter (reordered < 1) # contains just 1 for reordered
 
-vh(data)
+#vh(data)
 
 ```
 
@@ -206,12 +207,12 @@ Here is the opportunity to scale some features:
 Split data into train and test dataset:
 ```{r}
 train <- as.data.frame(data[data$eval_set == "train",])
-
-#added a split on the train to create a validationset
-set.seed(123)
-usersplit <- sample(unique(train$user_id),30000)
-test <- train[train$user_id %in% usersplit,]
-train <- train[!train$user_id %in% usersplit,]
+# 
+# #added a split on the train to create a validationset
+# set.seed(123)
+# usersplit <- sample(unique(train$user_id),30000)
+# test <- train[train$user_id %in% usersplit,]
+# train <- train[!train$user_id %in% usersplit,]
 
 #remove some columns
 train$eval_set <- NULL
@@ -221,7 +222,7 @@ train$order_id <- NULL
 train$reordered[is.na(train$reordered)] <- 0 #reordered Nas == 0
 #save(train, file = "train_xboost_vera_nuemro3.rda")
 
-#test <- as.data.frame(data[data$eval_set == "test",]) #not used for validation
+test <- as.data.frame(data[data$eval_set == "test",]) #not used for validation
 test$eval_set <- NULL
 test$user_id <- NULL
 test$reordered <- NULL
@@ -255,17 +256,20 @@ params <- list(
 
 ```{r}
 
-subtrain <- train %>% sample_frac(0.5) #train just on a fraction due to computation probs
+subtrain <- train # %>% sample_frac(0.5) #train just on a fraction due to computation probs
 X <- xgb.DMatrix(as.matrix(subtrain %>% select(-reordered)), label = subtrain$reordered) #create xgb matrix
 model <- xgboost(data = X, 
                  params = params, 
                  nrounds = 300,
-                 nthread = 16
+                 #nfold = 10,
+                 nthread = 20,
+                 verbose = TRUE,
+                 early_stopping_rounds = 20,
+                 maximize = FALSE
                  )
 
 importance <- xgb.importance(colnames(X), model = model)
 xgb.ggplot.importance(importance)
-
 
 #ggsave(xgb.ggplot.importance(importance), file = "feature_importance.png")
 ```
