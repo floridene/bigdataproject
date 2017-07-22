@@ -31,7 +31,7 @@ A comprehensive data analysis was done via the databricks community/spark. Datab
 
 Some specific visualization results are presented in the following: 
 
-The dataset is anonymized and contains a sample of over 3 million grocery orders from more than 200,000 users. For each user, we provide between 4 and 100 of their orders, with the sequence of products purchased in each order. Moreover, the week and hour of day the order was placed are also provided, and a relative measure of time between orders.
+The dataset is anonymized and contains a sample of over 3 million grocery orders from more than 200,000 users. For each user, Kaggle provides between 4 and 100 of their orders, with the sequence of products purchased in each order. Moreover, the week and hour of day the order was placed are also provided, and a relative measure of time between orders.
 
 In order to to facilitate, simplify and better understand the content and relationships between all the csv files provided by Kaggle, a schema including connections to multiple data tables have been visualized via the SQL architecture. Besides, all data types are specified. An opportunity to see the origin of each column on this schema is obtained.
 
