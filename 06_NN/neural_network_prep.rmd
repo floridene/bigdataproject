@@ -58,16 +58,6 @@ write.csv(Y2, file="nn_Y.csv")
 
 ```
 
-```{r}
-X3 <- orders_products %>%
-  group_by(order_id) %>%
-  summarise(
-    products = paste(product_id, collapse = " ")
-  )
-
-head(X3)
-```
-
 
 ```{r}
 library(rnn)
@@ -85,4 +75,34 @@ loss_function = loss_L1
 model <- trainr(Y, X, learningrate, network_type, update_rule, sigmoid, loss_function
                 )
 ```
+```{r}
+head(op)
+```
+
+
+```{r}
+vh(orders_products)
+
+op <- orders_products %>% select (user_id, order_number, product_id, order_dow, order_hour_of_day, days_since_prior_order, add_to_cart_order, reordered) %>% arrange(user_id, order_number, add_to_cart_order)
+
+vh(op)
+```
+
+Split into X and Y:
+
+```{r}
+
+#testorders <- orders %>% filter(eval_set=="test") %>% select(user_id,order_id)
+#testusers <- testorders[,1] #75000 users
+
+X <- orders_products %>% group_by(user_id) %>% filter(order_number!=max(order_number) & user_id %in% testusers) %>% ungroup()
+Y <- orders_products %>% group_by(user_id) %>% filter(order_number==max(order_number) & user_id %in% testusers) %>% ungroup()
+
+dim(X)
+vh(Y)
+
+write.csv(X, file = "X_train.csv" )
+write.csv(Y, file = "Y_train.csv" )
+```
+
 
