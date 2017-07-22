@@ -1,0 +1,2 @@
+"","objective","eval_metric","eta","gamma","max_depth","min_child_weight","max_delta_step","subsample","colsample_bytree","lambda","alpha"
+"1","binary:logistic","logloss",0.113933737247717,0.14404706787318,8,17,2,0.718962029437535,0.796535715973005,10,5.20627620629966e-05
