@@ -1,0 +1,23 @@
+---
+title: "neural network prep"
+author: "MP"
+date: "22 7 2017"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+load("/home/Vera_Weidmann/Supermarket/00_Data/boing_test.rda")
+
+label_user <- boing_test %>% group_by(user_id) %>% filter(order_number==max(order_number)) %>% select(nextbasket=vector2)
+label <- boing_test %>% group_by(user_id) %>% filter(order_number==max(order_number)) %>% ungroup() %>% select(nextbasket=vector2)
+train <- boing_test %>% group_by(user_id) %>% filter(order_number!=max(order_number)) %>% summarise(baskets=list(vector1))
+test <- boing_test %>% group_by(user_id) %>% summarise(baskets=list(vector1))
+
+write.csv(label_user, file="nn_label_user.csv")
+write.csv(label, file="nn_label.csv")
+write.csv(train, file="nn_train.csv")
+write.csv(test, file="nn_test.csv")
+
+```
+
