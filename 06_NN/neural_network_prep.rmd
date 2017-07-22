@@ -14,6 +14,18 @@ label <- boing_test %>% group_by(user_id) %>% filter(order_number==max(order_num
 train <- boing_test %>% group_by(user_id) %>% filter(order_number!=max(order_number)) %>% summarise(baskets=list(vector1))
 test <- boing_test %>% group_by(user_id) %>% summarise(baskets=list(vector1))
 
+head(label_user) # last basekt Y
+head(label)      # last basket Y
+head(train)      # traindata -> baskets - last basket
+head(test)       # testdata -> all baskets
+
+label_user$nextbasket <- as.character(label_user$nextbasket)
+label$nextbasket <- as.character(label$nextbasket)
+train$baskets <- as.character(train$baskets)
+test$baskets <- as.character(test$baskets)
+
+#vh(test)
+
 write.csv(label_user, file="nn_label_user.csv")
 write.csv(label, file="nn_label.csv")
 write.csv(train, file="nn_train.csv")
