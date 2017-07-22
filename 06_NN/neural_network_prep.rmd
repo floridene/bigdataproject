@@ -11,25 +11,78 @@ load("/home/Vera_Weidmann/Supermarket/00_Data/boing_test.rda")
 
 label_user <- boing_test %>% group_by(user_id) %>% filter(order_number==max(order_number)) %>% select(nextbasket=vector2)
 label <- boing_test %>% group_by(user_id) %>% filter(order_number==max(order_number)) %>% ungroup() %>% select(nextbasket=vector2)
+
 train <- boing_test %>% group_by(user_id) %>% filter(order_number!=max(order_number)) %>% summarise(baskets=list(vector1))
+
 test <- boing_test %>% group_by(user_id) %>% summarise(baskets=list(vector1))
 
 head(label_user) # last basekt Y
 head(label)      # last basket Y
-head(train)      # traindata -> baskets - last basket
+head(train)      # traindata X -> baskets - last basket
 head(test)       # testdata -> all baskets
 
 label_user$nextbasket <- as.character(label_user$nextbasket)
 label$nextbasket <- as.character(label$nextbasket)
 train$baskets <- as.character(train$baskets)
 test$baskets <- as.character(test$baskets)
+vh(boing_test)
+boing_test$vector1 <- as.character(boing_test$vector1)
+boing_test$vector2 <- as.character(boing_test$vector2)
+class(boing_test$basket)
 
 #vh(test)
 
+write.csv(boing_test, file = "boing_test.csv" )
 write.csv(label_user, file="nn_label_user.csv")
 write.csv(label, file="nn_label.csv")
 write.csv(train, file="nn_train.csv")
 write.csv(test, file="nn_test.csv")
 
+```
+
+```{r}
+X2 <- boing_test %>% group_by(user_id) %>% filter(order_number!=max(order_number)) %>% select (user_id, order_number, basket) 
+Y2 <- boing_test %>% group_by(user_id) %>% filter(order_number==max(order_number)) %>% ungroup()  %>% select (user_id, order_number, basket)
+
+head(X2)
+head(Y2)
+
+library(splitstackshape)
+X2 <- splitstackshape::cSplit(X2,splitCols = "basket", sep = " ",direction = "wide")
+Y2 <- splitstackshape::cSplit(Y2,splitCols = "basket", sep = " ",direction = "wide")
+vh(X2)
+vh(Y2)
+
+write.csv(X2, file = "nn_X.csv" )
+write.csv(Y2, file="nn_Y.csv")
+
+```
+
+```{r}
+X3 <- orders_products %>%
+  group_by(order_id) %>%
+  summarise(
+    products = paste(product_id, collapse = " ")
+  )
+
+head(X3)
+```
+
+
+```{r}
+library(rnn)
+```
+
+```{r}
+X =  train
+Y = label
+learningrate = 0.001
+network_type = "rnn" # "lstm"
+update_rule = "sgd"
+sigmoid = c("tanh")
+loss_function = loss_L1
+
+model <- trainr(Y, X, learningrate, network_type, update_rule, sigmoid, loss_function
+                )
 ```
 
