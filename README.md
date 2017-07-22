@@ -44,7 +44,8 @@ We have 134 aisles at total. These aisles contain different products and are gro
 ![alt text](https://github.com/vhwr/bigdataproject/blob/master/10_Pictures/databig.png)
 
 
-Our purpose is to predict the next basket of customers as mentioned before. To reach the output we want, what we need as information is to have customers who reorder a product one or many times. Otherwise, we would not make a prediction depending on the accuracy. The more a customer reorder the same products in his/her basket, the better we can get an accurate estimation. Therefore, we can say that our focus in the given dataset is the reordered products by users which make the 60% of the whole dataset.
+In the bar chart below, we have observed products which are contained in more than 64,000 baskets. These products are highly ordered by customers and therefore they are considered as “frequent”.The frequency bar chart demonstrates lots of fruits and vegetables. So we  were right about our assumption by saying that “fresh fruit” aisle will probably be the aisle which customers buy the products the most. This is also about the huge amount of products that fresh fruit aisle contain. Specifically, Banana can be observed as the product which is really highly demanded.
+
 
 ![alt text](https://github.com/vhwr/bigdataproject/blob/master/10_Pictures/s.png)
 
