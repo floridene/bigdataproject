@@ -201,22 +201,31 @@ Here is the opportunity to scale some features:
 ```
 
 
+
+
 Split data into train and test dataset:
 ```{r}
 train <- as.data.frame(data[data$eval_set == "train",])
+
+#added a split on the train to create a validationset
+set.seed(123)
+usersplit <- sample(unique(train$user_id),30000)
+test <- train[train$user_id %in% usersplit,]
+train <- train[!train$user_id %in% usersplit,]
+
 #remove some columns
 train$eval_set <- NULL
 train$user_id <- NULL
 #train$product_id <- NULL
 train$order_id <- NULL
 train$reordered[is.na(train$reordered)] <- 0 #reordered Nas == 0
-save(train, file = "train_xboost_vera_nuemro3.rda")
+#save(train, file = "train_xboost_vera_nuemro3.rda")
 
-test <- as.data.frame(data[data$eval_set == "test",])
+#test <- as.data.frame(data[data$eval_set == "test",]) #not used for validation
 test$eval_set <- NULL
 test$user_id <- NULL
 test$reordered <- NULL
-save(test, file = "test_xboost_vera_numer03.rda")
+#save(test, file = "test_xboost_vera_numer03.rda")
 ```
 
 # CV to find the best params:
@@ -225,8 +234,8 @@ can be fined in xgboost_vera_numero1_cv.R
 # Fit model
 ```{r}
 #new params:
-best_params <- read_csv("~/bigdataproject/03_XGBoost/2107xgboost_vera_best_parameters_FinalCV.csv")
-best_params
+#best_params <- read_csv("~/bigdataproject/03_XGBoost/2107xgboost_vera_best_parameters_FinalCV.csv")
+#best_params
 
 params <- list(
   "objective"           = "binary:logistic",
@@ -246,7 +255,7 @@ params <- list(
 
 ```{r}
 
-subtrain <- train #%>% sample_frac(0.1) #train just on a fraction due to computation probs
+subtrain <- train %>% sample_frac(0.5) #train just on a fraction due to computation probs
 X <- xgb.DMatrix(as.matrix(subtrain %>% select(-reordered)), label = subtrain$reordered) #create xgb matrix
 model <- xgboost(data = X, 
                  params = params, 
@@ -258,7 +267,7 @@ importance <- xgb.importance(colnames(X), model = model)
 xgb.ggplot.importance(importance)
 
 
-ggsave(xgb.ggplot.importance(importance), file = "feature_importance.png")
+#ggsave(xgb.ggplot.importance(importance), file = "feature_importance.png")
 ```
 
 
@@ -267,6 +276,8 @@ ggsave(xgb.ggplot.importance(importance), file = "feature_importance.png")
 Y <- xgb.DMatrix(as.matrix(test %>% select(-order_id)))
 test$reordered <- predict(model, Y)
 
+forcuts <- test %>% select(order_id,product_id,reordered)
+save(forcuts,file="forcuts.rda")
 #save(test, file= "2207predictions_xgboost_vera_numero3_newparams.rda")
 #vh(test)
 ```

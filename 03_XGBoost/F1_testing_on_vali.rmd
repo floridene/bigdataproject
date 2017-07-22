@@ -1,0 +1,62 @@
+---
+title: "F1 cutoffpoint detection"
+author: "MP"
+date: "22 7 2017"
+output: html_document
+---
+
+```{r}
+load("forcuts.rda")
+```
+
+```{r}
+actual <- op_train[op_train$user_id %in% usersplit,]
+actual <- actual %>% group_by(order_id) %>% summarise(basket=paste(product_id, collapse=" ")) %>%
+  mutate(vector1= basket %>%
+  strsplit(split = " "))
+actual <- actual %>% arrange(order_id)
+```
+
+```{r F1 Score, message=FALSE, warning=FALSE}
+require(stringr)
+f1score <- function(list_a, list_b) # actual versus predicted
+{
+  list_a <- str_split(list_a, ' ')[[1]]
+  list_b <- str_split(list_b, ' ')[[1]]
+  x <- length(intersect(list_a, list_b))
+  pr <- x/length(list_b)
+  re <- x/length(list_a)
+  f1 <- 0
+  if (pr + re)
+  {
+    f1 <- 2 * pr * re /(pr  +re)
+  }
+  return(f1)
+}
+```
+
+```{r}
+grid <- seq(0.1,0.3,0.005)
+res <- as.data.frame(cbind(grid,0))
+
+for(i in grid){
+  print(i)
+cut <- forcuts %>% 
+  mutate(reordered=ifelse(reordered>=i,1,0)) %>% #cut
+  filter(reordered==1) %>%
+  group_by(order_id) %>%
+  summarise(products = paste(product_id, collapse = " ")) %>%
+  ungroup %>%
+  select(order_id,products)
+
+
+  what<- actual %>% left_join(cut, by="order_id") %>% group_by(order_id) %>% mutate(f1=f1score(products,basket)) %>% ungroup()
+res[grid==i,2] <-mean(what$f1)
+}
+
+library(ggplot2)
+  ggplot(res, aes(x=grid,y=V2))+geom_line()
+
+ res[res$V2==max(res$V2),]
+```
+

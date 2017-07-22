@@ -76,6 +76,7 @@ prd <- orders_products %>% #just prior information
   summarise(
     prod_orders = n(), #count products
     prod_reorders = sum(reordered), #count products reordered
+    prod_avg_reorders = mean(reordered), #average reorder rate for items
     prod_first_orders = sum(product_time == 1), #product bought first time
     prod_second_orders = sum(product_time == 2) #product bought second time
   )
@@ -84,7 +85,6 @@ prd <- orders_products %>% #just prior information
 
 prd$prod_reorder_probability <- prd$prod_second_orders / prd$prod_first_orders
 prd$prod_reorder_times <- 1 + prd$prod_reorders / prd$prod_first_orders
-prd$prod_reorder_ratio <- prd$prod_reorders / prd$prod_orders
 
 prd <- prd %>% select(-prod_reorders, -prod_first_orders, -prod_second_orders)
 ```
@@ -147,8 +147,15 @@ plot(orders_products$eval_set)
 ```{r}
 orders_products %>% filter(eval_set == "test" | eval_set == "train") # 0 -> just prior
 
+usaisle <- orders_products %>% left_join(products %>% select(-product_name))%>%
+  group_by(user_id, aisle) %>% 
+  summarise(n_aisle=n()) %>% mutate(p_aisle=n_aisle/sum(n))
+usdep <- orders_products %>% left_join(products %>% select(-product_name))%>%
+  group_by(user_id, department) %>% 
+  summarise(n_dep=n()) %>% mutate(p_dep=n_dep/sum(n))
+
 #trained on prior information
-data <- orders_products %>%
+data <- orders_products %>% left_join(products %>%
   group_by(user_id, product_id) %>% 
   summarise(
     up_orders = n(),

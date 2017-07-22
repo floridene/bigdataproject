@@ -1,0 +1,62 @@
+---
+title: "cutoff_numero3"
+author: "MP"
+date: "22 7 2017"
+output: html_document
+---
+
+```{r}
+load("/home/Vera_Weidmann/bigdataproject/03_XGBoost/2207predictions_xgboost_vera_numero3_newparams.rda")
+```
+
+
+```{r}
+sub.pred <- test %>% select(order_id,product_id, reordered)
+
+grid <- c(0.19,0.21,0.23)
+
+for(i in grid){
+global.pred <- sub.pred %>% mutate(reordered=reordered > i * 1)
+submission <- global.pred %>%
+  filter(reordered == 1) %>%
+  group_by(order_id) %>%
+  summarise(
+    products = paste(product_id, collapse = " ")
+  )
+
+missing <- data.frame(
+  order_id = unique(test$order_id[!test$order_id %in% submission$order_id]),
+  products = "None"
+)
+submission <- submission %>% bind_rows(missing) %>% arrange(order_id)
+write.csv(submission, file = paste("sub_numero3_",as.character(i),".csv",sep=""), row.names = F)
+}
+
+```
+0.17=0.3804065
+0.19=0.3815259
+0.21=0.3814119
+0.23=0.3807282
+
+
+```{r}
+grid <- c(0.15,0.17)
+
+for(i in grid){
+global.pred <- sub.pred %>% mutate(reordered=reordered > i * 1)
+submission <- global.pred %>%
+  filter(reordered == 1) %>%
+  group_by(order_id) %>%
+  summarise(
+    products = paste(product_id, collapse = " ")
+  )
+
+missing <- data.frame(
+  order_id = unique(test$order_id[!test$order_id %in% submission$order_id]),
+  products = "None"
+)
+submission <- submission %>% bind_rows(missing) %>% arrange(order_id)
+write.csv(submission, file = paste("sub_numero3_",as.character(i),".csv",sep=""), row.names = F)
+}
+```
+
