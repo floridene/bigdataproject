@@ -60,13 +60,17 @@ get_preds <- function(data=markov,basket=vector2){
   data[basket,] %>% colMeans() %>% sort(decreasing=TRUE)
 }
 
- y <- get_preds(mmc$markov[[1]],mmc$vector2[[1]])
- y= y[y>0]
-  x <- as.data.frame(cbind(user_id=mmc$user_id[1],
-                           order_id=mmc$order_id[1], 
-                           product_id=names(y),
-                           reordered=as.numeric(y)),stringsAsFactors=FALSE)
-  preds <- x
+oneitemusers <-mmc %>% filter(user_average_basket==1 & user_reorder_ratio==1)
+
+mmc <- mmc %>% filter(!user_id %in% oneitemusers$user_id)
+
+y <- get_preds(mmc$markov[[1]],mmc$vector2[[1]])
+y= y[y>0]
+x <- as.data.frame(cbind(user_id=mmc$user_id[1],
+                         order_id=mmc$order_id[1], 
+                         product_id=names(y),
+                         reordered=as.numeric(y)),stringsAsFactors=FALSE)
+preds <- x
 
 for(i in 2:nrow(mmc)){
   y <- get_preds(mmc$markov[[i]],mmc$vector2[[i]])
@@ -76,38 +80,75 @@ for(i in 2:nrow(mmc)){
                            product_id=names(y),
                            reordered=as.numeric(y)),stringsAsFactors=FALSE)
   preds <- bind_rows(preds,x)
+  print(i)
 }
 
-save(preds, file="markovchainspreds.rda")
+
+#save(preds, file="markovchainpreds.rda")
+```
+
+```{r}
+load("/home/Max_Philipp/bigdataproject/00_R_scrits_bash/markovchainpreds.rda")
+nauser <- preds %>% filter(is.na(product_id))
+```
+
+```{r}
+get_preds_all <- function(data=markov,basket=vector2){
+  data %>% colMeans() %>% sort(decreasing=TRUE)
+}
+
+
+nammc <- mmc %>% filter(user_id %in% nauser$user_id)
+
+y <- get_preds_all(nammc$markov[[1]],nammc$vector2[[1]])
+y= y[y>0]
+x <- as.data.frame(cbind(user_id=nammc$user_id[1],
+                         order_id=nammc$order_id[1], 
+                         product_id=names(y),
+                         reordered=as.numeric(y)),stringsAsFactors=FALSE)
+preds_na <- x
+
+for(i in 2:nrow(nammc)){
+  y <- get_preds_all(nammc$markov[[i]],nammc$vector2[[i]])
+  y= y[y>0]
+  x <- as.data.frame(cbind(user_id=nammc$user_id[i],
+                           order_id=nammc$order_id[i], 
+                           product_id=names(y),
+                           reordered=as.numeric(y)),stringsAsFactors=FALSE)
+  preds_na <- bind_rows(preds_na,x)
+  print(i)
+}
+
 ```
 
 
-
 ```{r}
- y <- get_preds(mmc$markov[[1]],mmc$vector2[[1]])
-  x <- as.data.frame(cbind(user_id=mmc$user_id,
-                           oder_id=mmc$order_id, 
-                           product_id=names(y),
-                           reordered=as.numeric(y)),stringsAsFactors=FALSE)
-  preds <- x
 
-for(i in 2:nrow(mmc)){
-  y <- get_preds(mmc$markov[[i]],mmc$vector2[[i]])
-  x <- as.data.frame(cbind(user_id=mmc$user_id,
-                           oder_id=mmc$order_id, 
-                           product_id=names(y),
-                           reordered=as.numeric(y)),stringsAsFactors=FALSE)
-  preds <- bind_rows(preds,x)
-}
 
-submission <- as.data.frame(cbind(predictions=mmcpreds,user_id=mmcm$user_id)) %>% 
-  mutate(user_id=secure_trans(user_id)) %>% 
-  left_join(lookup[,c(1,5)],by="user_id") %>% 
-  group_by(user_id) %>% 
-  mutate(products =paste(unlist(predictions), collapse = " ")) %>% 
+submission <- preds %>% 
+  mutate(order_id=as.numeric(order_id)) %>%
+  left_join(lookup[,c(5,3)],by="order_id") %>% 
+  filter(!is.na(product_id)) %>%
+  group_by(order_id) %>% 
+    mutate(index=row_number()) %>% 
+  filter(index<=user_average_basket) %>%
+  summarise(products =paste(product_id, collapse = " ")) %>% 
   ungroup() %>% 
   select(order_id,products)
 
+oneitemsub <- oneitemusers %>% mutate(vector2=as.character(vector2)) %>% select(order_id,products=vector2)
 
-write.csv(submission, file = "sub_minimarkov_1307.csv", row.names = F)
+nasub <- preds_na %>%
+  mutate(order_id=as.numeric(order_id)) %>%
+  left_join(lookup[,c(5,3)],by="order_id") %>% 
+  group_by(order_id) %>% 
+    mutate(index=row_number()) %>% 
+  filter(index<=user_average_basket) %>%
+  summarise(products =paste(product_id, collapse = " ")) %>% 
+  ungroup() %>% 
+  select(order_id,products)
+
+submission_all <- bind_rows(submission, oneitemsub, nasub) %>% arrange(order_id)
+
+write.csv(submission_all, file = "sub_minimarkov_2307.csv", row.names = F)
 ```

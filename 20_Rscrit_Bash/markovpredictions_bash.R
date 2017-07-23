@@ -17,6 +17,10 @@ get_preds <- function(data=markov,basket=vector2){
   data[basket,] %>% colMeans() %>% sort(decreasing=TRUE)
 }
 
+oneitemusers <-mmc %>% filter(user_average_basket==1 & user_reorder_ratio==1)
+
+mmc <- mmc %>% filter(!user_id %in% oneitemusers$user_id)
+
 y <- get_preds(mmc$markov[[1]],mmc$vector2[[1]])
 y= y[y>0]
 x <- as.data.frame(cbind(user_id=mmc$user_id[1],
@@ -33,6 +37,8 @@ for(i in 2:nrow(mmc)){
                            product_id=names(y),
                            reordered=as.numeric(y)),stringsAsFactors=FALSE)
   preds <- bind_rows(preds,x)
+  print(i)
 }
+
 
 save(preds, file="markovchainpreds.rda")
