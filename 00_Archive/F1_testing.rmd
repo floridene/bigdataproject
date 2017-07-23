@@ -1,0 +1,136 @@
+---
+title: "F1 Testing"
+author: "MP"
+date: "1 7 2017"
+output: html_document
+---
+
+In this code we will test different models for accuracy, using the F1 Score, which is defined in the chunk below. source: https://www.kaggle.com/rafaelmdourado/f1-score-with-r/notebook in the comments by grandmaster Konrad Banachewicz.
+
+```{r F1 Score, message=FALSE, warning=FALSE}
+require(stringr)
+f1score <- function(list_a, list_b)
+{
+  list_a <- str_split(list_a, ' ')[[1]]
+  list_b <- str_split(list_b, ' ')[[1]]
+  x <- length(intersect(list_a, list_b))
+  pr <- x/length(list_b)
+  re <- x/length(list_a)
+  f1 <- 0
+  if (pr + re)
+  {
+    f1 <- 2 * pr * re /(pr  +re)
+  }
+  return(f1)
+}
+```
+
+
+```{r Loading Data}
+library(arulesViz)
+library(dplyr)
+library(markovchain)
+load("/home/Vera_Weidmann/Supermarket/00_Data/boing.rda")
+load("/home/Vera_Weidmann/Supermarket/00_Data/test_orders.rda")
+```
+
+here we compute the overall average F1 value, if we would predict the Basket t with Basket t-1
+
+```{r global F1}
+boing <- boing %>% group_by(user_id,order_number) %>% mutate(F1=f1score(vector1,vector2))
+mean(boing$F1)
+```
+The mean F1 score is .17, which is below all kaggle competitors. lets check this again for only train users and there last basket versus the train-basket
+
+```{r subset boing_train}
+boing_train <- boing[!boing$user_id %in% test_orders$user_id,]
+#save(boing_train, file="/home/Vera_Weidmann/Supermarket/00_Data/boing_train.rda")
+```
+
+```{r F1 train}
+tmp <-boing_train %>% group_by(user_id) %>% filter(order_number==max(order_number))
+
+tmp <- tmp %>% mutate(F1=f1score(vector1,vector2))
+
+mean(tmp$F1)
+```
+
+Now we have a baseline, which is around 0.17, all our models and ideas which perform better than 0.17 in f1scores are cosidered valueable :)
+
+```{r longdatasubset}
+row=1
+x <-cbind(rep(boing_train$vector1[[row]], each=length(boing_train$vector2[[row]])),rep(boing_train$vector2[[row]],length(boing_train$vector1[[row]])), rep(boing_train$user_id[row],length.out=length(boing_train$vector2[[row]])*length(boing_train$vector1[[row]])))
+
+for(row in 2:114){
+  y <-cbind(rep(boing_train$vector1[[row]], each=length(boing_train$vector2[[row]])),rep(boing_train$vector2[[row]],length(boing_train$vector1[[row]])), rep(boing_train$user_id[row],length.out=length(boing_train$vector2[[row]])*length(boing_train$vector1[[row]])))
+  x <- rbind(x,y)
+}
+x <- as.data.frame(x)
+```
+
+```{r apriori}
+baskets <- boing_train %>% group_by(user_id) %>% filter(order_number==max(order_number)) %>% ungroup() %>% select(vector2)
+baskets <- c(boing_train$vector1, baskets$vector2)
+
+allitems <- as.data.frame(as.character(unique(unlist(baskets)))) #all unique items
+colnames(allitems) <- "items" 
+
+baskets <- as(baskets, "transactions")
+
+rules <- apriori(baskets,parameter=list(supp=0.00001, conf=0.5,target="rules",maxtime=30)) #create apriori rules, confidence 50% as threshold
+```
+
+replace x with longdata_train once it can be loaded
+
+```{r MC-prep}
+load("/home/Vera_Weidmann/Supermarket/00_Data/df_train_markov.rda")
+actuals <- df_train_markov %>% 
+  group_by(user_id) %>%
+  summarise(basket=paste(product_id, collapse=" ")) %>%
+  mutate(vector1= basket %>%
+  strsplit(split = " ")) #get train in boing format
+
+final_orders <- boing_train %>% group_by(user_id) %>% filter(order_number==max(order_number)) %>% select(user_id,basket, vector1) #select latest prior basket
+```
+
+```{r usermeans}
+#whats the mean n of user?
+#user_means <- boing_train %>% group_by(user_id,order_number) %>% summarise(n=length(vector1)) %>% summarise(m=mean(n)) %>% round(0)
+```
+
+```{r}
+old <- array()
+new <- array()
+apr <- array()
+tot <- array()
+i=1
+for(user in unique(x$V3)){
+TransMC <- as.data.frame(markovchainFit(x %>% filter(V3==user) %>%select(V1,V2))$estimate@transitionMatrix) #mini markovchain
+last <- final_orders[final_orders$user_id==user,3]
+actual <- actuals[actuals$user_id==user,3] # train
+
+old[i] <- f1score(last,actual)
+
+last <- unlist(last) # last prior
+preds <- TransMC[last,] %>% colMeans() %>% sort(decreasing=TRUE) #predictions on mini mc
+
+preds.names <- list(c(names(preds[preds>0]))) # cut preds
+new[i] <- f1score(preds.names,actual)
+preds.names <- names(preds[preds>0]) # cut preds
+
+#need workaround in case rulesubset is not existing
+rules.sub <- subset(rules, subset = !lhs %in% as.character(allitems[!allitems$items %in% preds.names,1]))
+
+rhs.desc <- as(inspect(rules.sub), "data.frame")[,-2] %>% arrange(-confidence) %>% mutate(rhs=gsub("[{}]","",rhs))
+#better algorithm from here
+rhs <- unique(rhs.desc$rhs)
+apr[i] <- f1score(list(rhs),actual)
+newbasket <- unique(c(rhs,preds.names))
+
+tot[i] <- f1score(list(newbasket),actual)
+i =i+1
+}
+
+mean(old);mean(new);mean(apr);mean(tot)
+```
+
