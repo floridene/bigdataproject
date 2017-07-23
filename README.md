@@ -21,7 +21,7 @@ R-code can be finded in the belonging folder of this repository. These scipts al
 * [Markovchain](https://github.com/vhwr/bigdataproject/tree/master/01_Markovchain) 
 * [Apriori](https://github.com/vhwr/bigdataproject/tree/master/02_Apriori) 
 * [XGBoost](https://github.com/vhwr/bigdataproject/tree/master/03_XGBoost) 
-* [RNN]() 
+* RNN (coming soon)
 
 #### Data Analysis
 
