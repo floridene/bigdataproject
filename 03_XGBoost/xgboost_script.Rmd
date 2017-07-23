@@ -63,7 +63,7 @@ Here we create new features which decribes the product, based on the prior order
 * prod_first_orders: reflects how often a product was added the first time to a basket
 * prod_second_orders: reflects how often a product was added the second time to a basket
 * prod_reorder_probability: How often a product was added a second time
-* prod_reorder_times: probability of how often a product was reordered from all products which were bought to first time.
+* prod_reorder_times: probability of how often a product was reordered from all products which were bought for the first time.
 * prod_reorder_ratio: probaility of how often a product was reordered from all product purchases. 
 
 ```{r}
@@ -154,7 +154,7 @@ vh(users)
 User & product specific features:
 * up_orders: how often one specific user ordered a products
 * up_first_order: when did this product occured at first
-* up_last_order: when did the product occured at least
+* up_last_order: when did the product occured the last time
 * up_average_cart_position: the average of when the product is added to the cart
 * up_order_rate: % of how often a specific product was bought
 * up_orders_since_last_order: difference between number of orders and the order when the product occured the last time
@@ -190,8 +190,7 @@ data <- data %>%
 sum(is.na(data$reordered)) # not reordered
 data %>% filter (reordered < 1) # contains just 1 for reordered
 
-#vh(data)
-
+View(head(data,50))
 ```
 
 Here is the opportunity to scale some features:
@@ -200,8 +199,6 @@ Here is the opportunity to scale some features:
 #data[,c(2:5,7,8,11)] <- scale(data[,c(2:5,7,8,11)])
 #head(data)
 ```
-
-
 
 
 Split data into train and test dataset:
@@ -227,10 +224,12 @@ test$eval_set <- NULL
 test$user_id <- NULL
 test$reordered <- NULL
 #save(test, file = "test_xboost_vera_numer03.rda")
+
+vh(test)
 ```
 
 # CV to find the best params:
-can be fined in xgboost_vera_numero1_cv.R
+can be fined in [xgboost_script_cv.R](https://github.com/vhwr/bigdataproject/blob/master/03_XGBoost/xgboost_script_cv.R)
 
 # Fit model
 ```{r}
@@ -277,21 +276,30 @@ xgb.ggplot.importance(importance)
 
 # Predict on model: 
 ```{r}
+
 Y <- xgb.DMatrix(as.matrix(test %>% select(-order_id)))
 test$reordered <- predict(model, Y)
 
-forcuts <- test %>% select(order_id,product_id,reordered)
-save(forcuts,file="forcuts.rda")
+test <- test %>% select(order_id,product_id,reordered)
+
+#save(forcuts,file="forcuts.rda")
 #save(test, file= "2207predictions_xgboost_vera_numero3_newparams.rda")
-#vh(test)
 ```
 
+Which cutoff is the best? For this approach we used [F1 Score.](https://github.com/vhwr/bigdataproject/blob/master/03_XGBoost/F1_testing_on_vali.rmd)
+As a result, we calcualte our best cutoff point at 0.19.
+
 ```{r}
+
 test$reordered <- (test$reordered > 0.19) * 1
+
 ```
+
+
 
 # Submission:
 ```{r}
+
 submission <- test %>%
   filter(reordered == 1) %>% #select just products which are predicted as reordered
   group_by(order_id) %>%
@@ -307,4 +315,5 @@ missing <- data.frame(
 
 submission <- submission %>% bind_rows(missing) %>% arrange(order_id)
 write.csv(submission, file = "xgboost_numero3_submission_2_new_params.csv", row.names = F)
+
 ```
