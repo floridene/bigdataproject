@@ -16,6 +16,11 @@ train <- boing_test %>% group_by(user_id) %>% filter(order_number!=max(order_num
 
 test <- boing_test %>% group_by(user_id) %>% summarise(baskets=list(vector1))
 
+vh(boing_test)
+vh(train)
+vh(test)
+vh(label_user)
+
 head(label_user) # last basekt Y
 head(label)      # last basket Y
 head(train)      # traindata X -> baskets - last basket
@@ -60,22 +65,6 @@ write.csv(Y2, file="nn_Y.csv")
 
 
 ```{r}
-library(rnn)
-```
-
-```{r}
-X =  train
-Y = label
-learningrate = 0.001
-network_type = "rnn" # "lstm"
-update_rule = "sgd"
-sigmoid = c("tanh")
-loss_function = loss_L1
-
-model <- trainr(Y, X, learningrate, network_type, update_rule, sigmoid, loss_function
-                )
-```
-```{r}
 head(op)
 ```
 
@@ -105,4 +94,17 @@ write.csv(X, file = "X_train.csv" )
 write.csv(Y, file = "Y_train.csv" )
 ```
 
+```{r}
+head(orders_products,150)
+orders_products <- orders_products %>% filter(eval_set == "prior" & user_id %in% testusers)
+
+
+X3 <- orders_products %>% group_by(user_id) %>% filter(order_number!=max(order_number)) %>% select (user_id, order_number, product_id) 
+Y3 <- orders_products %>% group_by(user_id) %>% filter(order_number==max(order_number)) %>% ungroup() %>% select (user_id, order_number, product_id)
+vh(X3)
+vh(Y3)
+write.csv(X3, "Input_RNN.csv")
+write.csv(Y3, "Output_RNN.csv")
+
+```
 
