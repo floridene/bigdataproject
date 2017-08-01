@@ -18,10 +18,10 @@ The purpose of this project is to predict/estimate the users' next orders based 
 
 R-code can be finded in the belonging folder of this repository. These scipts also include some explanations about our approach and used commands. 
 
-* [Markovchain](https://github.com/vhwr/bigdataproject/tree/master/01_Markovchain) 
-* [Apriori](https://github.com/vhwr/bigdataproject/tree/master/02_Apriori) 
-* [XGBoost](https://github.com/vhwr/bigdataproject/tree/master/03_XGBoost) 
-* [RNN]() 
+* [Markovchain](https://github.com/vhwr/bigdataproject/blob/master/01_Markovchain/minimarkov.rmd) 
+* [Apriori](https://github.com/vhwr/bigdataproject/blob/master/02_Apriori/apriori_markovchain.rmd) 
+* [XGBoost](https://github.com/vhwr/bigdataproject/blob/master/03_XGBoost/xgboost_script.Rmd) 
+* RNN (coming soon)
 
 #### Data Analysis
 
